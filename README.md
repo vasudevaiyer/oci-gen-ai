@@ -1,9 +1,10 @@
-# Step-by-Step: Client App Calling OCI GenAI Agent Endpoint for Weather
+# Step-by-Step: Function Tool Demo with OCI GenAI Agent Service
 
-This guide covers one use case only:
-- A client sends user input to an OCI Generative AI Agent endpoint.
-- The agent uses a local function tool (`get_current_weather`) during ADK execution.
-- The client receives the final weather answer.
+This project demonstrates OCI Agent **function-calling** with static weather data:
+- A client app sends user input to an OCI Agent endpoint.
+- OCI Agent requests `get_current_weather(...)`.
+- ADK executes the local function from `weather_static.json`.
+- The client receives the final agent answer.
 
 ## 1. What You Need
 
@@ -30,7 +31,22 @@ This guide covers one use case only:
 source /u01/venv/bin/activate
 ```
 
-## 4. Verify Local Tool Data (Optional but Recommended)
+## 4. One-Time Setup: Register/Sync Function Tool on Agent
+
+Run this once to sync local function tool definition with the remote agent (`agent.setup()` is called internally):
+
+```bash
+python /u01/scripts/agent_fucn_tool/oci_agent_weather_tool.py \
+  --location "Chicago" \
+  --agent-endpoint-id "<agent_or_endpoint_ocid>"
+```
+
+What this does:
+- Resolves endpoint OCID (if agent OCID is provided).
+- Registers/synchronizes `get_current_weather` on the agent.
+- Executes one sample prompt end-to-end.
+
+## 5. Verify Local Tool Data (Optional but Recommended)
 
 Run a local-only test before endpoint calls:
 
@@ -43,7 +59,7 @@ python /u01/scripts/agent_fucn_tool/oci_agent_weather_tool.py \
 Expected behavior:
 - Returns JSON with weather fields from `weather_static.json`.
 
-## 5. Run the Client for One User Request
+## 6. Run the Client for One User Request
 
 Use your endpoint OCID:
 
@@ -56,7 +72,7 @@ python /u01/scripts/agent_fucn_tool/genai_weather_client.py \
 You can also pass an agent OCID (`ocid1.genaiagent...`):
 - The script resolves the latest ACTIVE endpoint automatically.
 
-## 6. Run the Client in Interactive Mode
+## 7. Run the Client in Interactive Mode
 
 ```bash
 python /u01/scripts/agent_fucn_tool/genai_weather_client.py \
@@ -67,7 +83,7 @@ Then type prompts like:
 - `What is the weather in Austin?`
 - `Tell me current weather for Tokyo.`
 
-## 7. How This Matches the Oracle Function Tool Pattern
+## 8. How This Matches the Oracle Function Tool Pattern
 
 Execution pattern:
 1. Your client calls the OCI agent endpoint with user input.
@@ -79,7 +95,27 @@ Execution pattern:
 Reference:
 - https://docs.oracle.com/en-us/iaas/Content/generative-ai-agents/adk/api-reference/examples/agent-function-tool.htm
 
-## 8. Common Errors and Fixes
+## 9. How a Client Application Uses This
+
+### CLI client (already provided)
+
+```bash
+python /u01/scripts/agent_fucn_tool/genai_weather_client.py \
+  --agent-endpoint-id "<agent_or_endpoint_ocid>" \
+  --input "What is the weather in Tokyo?"
+```
+
+### Backend integration pattern
+
+In your backend service, reuse the same flow from `genai_weather_client.py`:
+1. Initialize `AgentClient`.
+2. Create `Agent(..., tools=[get_current_weather])`.
+3. Call `agent.setup()` on startup.
+4. Call `agent.run(input=user_prompt)` per request.
+
+This keeps tool execution in your application runtime (required for local function tools).
+
+## 10. Common Errors and Fixes
 
 - `FUNCTION_CALLING_REQUIRED_ACTION` without final answer:
   - Cause: calling from an environment that does not execute local function tools.
@@ -93,7 +129,7 @@ Reference:
   - Cause: location not present in `weather_static.json` mappings.
   - Fix: add mapping/record in `weather_static.json`.
 
-## 9. Validate Scripts Compile
+## 11. Validate Scripts Compile
 
 ```bash
 source /u01/venv/bin/activate
@@ -101,11 +137,7 @@ python -m py_compile /u01/scripts/agent_fucn_tool/oci_agent_weather_tool.py
 python -m py_compile /u01/scripts/agent_fucn_tool/genai_weather_client.py
 ```
 
-## 10. Minimal Integration Pattern (App -> Client)
+## 12. Data File
 
-If building a web/mobile backend, call the same client logic from your API layer:
-1. Receive `location` or user prompt.
-2. Call `Agent.run(input=...)` using the setup in `genai_weather_client.py`.
-3. Return the agent response payload to the frontend.
-
-This keeps the function tool execution in your controlled backend runtime.
+- `weather_static.json` is the only weather source for this demo.
+- Update country records or city mappings there to change tool output.
