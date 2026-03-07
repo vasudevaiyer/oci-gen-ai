@@ -22,8 +22,7 @@ from oci.generative_ai_agent import GenerativeAiAgentClient
 
 
 DEFAULT_AGENT_ENDPOINT_ID = (
-    "ocid1.genaiagent.oc1.us-chicago-1."
-    "amaaaaaaimfwupqaiqvrm5pmgcqetm3yvrykiajvwrvdpgxkmxapls3egraa"
+    "ocid1.genaiagent.oc1.us-chicago-1......."
 )
 DEFAULT_OCI_CONFIG = "/home/opc/.oci/config"
 DEFAULT_STATIC_WEATHER_FILE = str(Path(__file__).with_name("weather_static.json"))

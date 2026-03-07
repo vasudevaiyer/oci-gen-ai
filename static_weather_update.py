@@ -18,8 +18,7 @@ from oci.generative_ai_agent.models import LlmConfig, LlmCustomization, UpdateAg
 
 
 DEFAULT_AGENT_ID = (
-    "ocid1.genaiagent.oc1.us-chicago-1."
-    "amaaaaaaimfwupqaiqvrm5pmgcqetm3yvrykiajvwrvdpgxkmxapls3egraa"
+    "ocid1.genaiagent.oc1.us-chicago-1........"
 )
 DEFAULT_CONFIG = "/home/opc/.oci/config"
 DEFAULT_PROFILE = "DEFAULT"
