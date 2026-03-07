@@ -1,0 +1,42 @@
+{
+  "countries": {
+    "united states": {"condition": "Partly Cloudy", "temperature_c": 12, "humidity_percent": 58},
+    "india": {"condition": "Sunny", "temperature_c": 30, "humidity_percent": 44},
+    "united kingdom": {"condition": "Light Rain", "temperature_c": 9, "humidity_percent": 76},
+    "japan": {"condition": "Clear", "temperature_c": 15, "humidity_percent": 50},
+    "australia": {"condition": "Warm Breeze", "temperature_c": 24, "humidity_percent": 40}
+  },
+  "city_to_country": {
+    "chicago": "united states",
+    "new york": "united states",
+    "seattle": "united states",
+    "austin": "united states",
+    "san francisco": "united states",
+    "los angeles": "united states",
+    "boston": "united states",
+    "miami": "united states",
+    "dallas": "united states",
+    "mumbai": "india",
+    "delhi": "india",
+    "bengaluru": "india",
+    "hyderabad": "india",
+    "chennai": "india",
+    "pune": "india",
+    "kolkata": "india",
+    "london": "united kingdom",
+    "manchester": "united kingdom",
+    "birmingham": "united kingdom",
+    "liverpool": "united kingdom",
+    "leeds": "united kingdom",
+    "tokyo": "japan",
+    "osaka": "japan",
+    "kyoto": "japan",
+    "yokohama": "japan",
+    "nagoya": "japan",
+    "sydney": "australia",
+    "melbourne": "australia",
+    "brisbane": "australia",
+    "perth": "australia",
+    "adelaide": "australia"
+  }
+}
