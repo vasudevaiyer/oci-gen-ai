@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.env
+.rag_service.pid
+data/uploads/
+data/extracted_images/
+.pytest_cache/

@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OCI RAG Solution Pack</title>
+  <link rel="stylesheet" href="/ui/styles.css?v=20260326k" />
+</head>
+<body>
+  <div class="mockup-page-shell">
+    <div class="mockup-app-frame reveal">
+      <aside class="mockup-sidebar">
+        <div class="mockup-brand">
+          <div class="mockup-brand-mark">RAG</div>
+          <div>
+            <h1>DocuChat</h1>
+            <p>RAG Application</p>
+          </div>
+        </div>
+
+        <div class="mockup-nav-group">
+          <p class="mockup-nav-label">Navigation</p>
+          <a class="mockup-nav-item mockup-nav-item-active" href="/">Ask Question</a>
+          <a class="mockup-nav-item" href="/governance">Governance</a>
+          <a class="mockup-nav-item" href="#recentQueriesPanel">History</a>
+        </div>
+      </aside>
+
+      <main class="mockup-main">
+        <header class="mockup-main-header">
+          <div>
+            <p class="mockup-kicker">Chat-first workspace</p>
+            <h2>RAG Application</h2>
+            <p class="mockup-subtitle">Ask questions and get grounded answers from your indexed corpus.</p>
+          </div>
+          <button id="refreshAll" class="mockup-ghost-action" type="button">Refresh</button>
+        </header>
+
+        <section class="mockup-dashboard-grid">
+          <section class="mockup-chat-stage">
+            <div id="assistantOutput" class="assistant-output mockup-assistant-output">
+              <article class="mockup-card mockup-answer-card">
+                <div class="mockup-card-headline mockup-answer-headline">
+                  <h3>Answer</h3>
+                  <span class="mockup-confidence-pill">Ready</span>
+                </div>
+                <p>
+                  Start with a question. Grounded answers, supporting sources, and relevant image context will appear here.
+                </p>
+              </article>
+            </div>
+
+            <article class="mockup-card mockup-question-card mockup-question-card-sticky">
+              <div class="mockup-card-headline">
+                <h3>Ask a Question</h3>
+              </div>
+              <form id="chatForm" class="mockup-question-shell mockup-question-form">
+                <textarea id="chatQuestion" class="mockup-question-textarea" rows="3" placeholder="Ask a grounded question about the indexed corpus"></textarea>
+                <input id="chatTopK" type="hidden" value="4" />
+                <input id="chatIncludeImages" type="checkbox" checked hidden />
+                <button class="mockup-send-button" type="submit">Send</button>
+              </form>
+            </article>
+          </section>
+
+          <aside class="mockup-right-rail">
+            <section class="mockup-metric-grid">
+              <article class="mockup-metric-card">
+                <strong id="documentsCount">0</strong>
+                <span>Documents</span>
+              </article>
+              <article class="mockup-metric-card">
+                <strong id="chunksCount">0</strong>
+                <span>Chunks</span>
+              </article>
+              <article class="mockup-metric-card">
+                <strong id="imagesCount">0</strong>
+                <span>Images</span>
+              </article>
+            </section>
+
+            <article class="mockup-card mockup-insight-card">
+              <div class="mockup-card-headline">
+                <h3>Evidence Summary</h3>
+              </div>
+              <ul id="evidenceSummaryList" class="mockup-insight-list">
+                <li>Primary evidence will appear here after the first answer.</li>
+                <li>Only the most relevant supporting sources stay visible.</li>
+                <li>The right rail stays lightweight and avoids document-browsing clutter.</li>
+              </ul>
+            </article>
+
+            <article id="recentQueriesPanel" class="mockup-card mockup-history-card">
+              <div class="mockup-card-headline">
+                <h3>Recent Queries</h3>
+              </div>
+              <div id="recentQueries" class="mockup-history-list">
+                <div class="empty-state">No questions yet in this session.</div>
+              </div>
+            </article>
+          </aside>
+        </section>
+      </main>
+    </div>
+
+    <section id="toast" class="toast hidden"></section>
+
+    <div id="imageModal" class="image-modal hidden">
+      <button id="closeImageModal" class="modal-close">Close</button>
+      <img id="modalImage" alt="Expanded result" />
+      <div id="modalCaption" class="modal-caption"></div>
+    </div>
+  </div>
+
+  <script src="/ui/app.js?v=20260326k"></script>
+</body>
+</html>

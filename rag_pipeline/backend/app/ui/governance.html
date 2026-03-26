@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Document Governance | OCI RAG Solution Pack</title>
+  <link rel="stylesheet" href="/ui/styles.css?v=20260326i" />
+</head>
+<body>
+  <div class="mockup-page-shell">
+    <div class="mockup-app-frame reveal">
+      <aside class="mockup-sidebar">
+        <div class="mockup-brand">
+          <div class="mockup-brand-mark">RAG</div>
+          <div>
+            <h1>DocuChat</h1>
+            <p>Governance Console</p>
+          </div>
+        </div>
+
+        <div class="mockup-nav-group">
+          <p class="mockup-nav-label">Navigation</p>
+          <a class="mockup-nav-item" href="/">Ask Question</a>
+          <a class="mockup-nav-item mockup-nav-item-active" href="/governance">Governance</a>
+          <a class="mockup-nav-item" href="/mockup-governance">Preview</a>
+        </div>
+      </aside>
+
+      <main class="mockup-main">
+        <header class="mockup-main-header">
+          <div>
+            <p class="mockup-kicker">Operational control</p>
+            <h2>Document Governance</h2>
+            <p class="mockup-subtitle">Manage ingestion, reindexing, and corpus inventory in a dedicated admin surface.</p>
+          </div>
+          <button id="refreshGovernance" class="mockup-ghost-action" type="button">Refresh</button>
+        </header>
+
+        <section class="mockup-dashboard-grid mockup-governance-grid">
+          <section class="mockup-chat-stage">
+            <section class="mockup-governance-control-grid">
+              <article class="mockup-card">
+                <div class="mockup-card-headline">
+                  <h3>Upload Files</h3>
+                  <span class="mockup-source-tag">Managed Import</span>
+                </div>
+                <form id="uploadForm" class="mockup-form-stack">
+                  <input id="fileInput" class="file-picker" type="file" name="files" multiple />
+                  <div id="uploadSelection" class="upload-selection empty-state">No files selected yet.</div>
+                  <div id="uploadStatus" class="upload-status" aria-live="polite"></div>
+                  <button id="uploadButton" class="mockup-send-button mockup-send-button-wide" type="submit">Upload and Index</button>
+                </form>
+              </article>
+
+              <article class="mockup-card">
+                <div class="mockup-card-headline">
+                  <h3>Import Existing Folder</h3>
+                </div>
+                <form id="folderForm" class="mockup-form-stack">
+                  <input id="folderPath" class="mockup-text-input" type="text" placeholder="/u01/scripts/oci_samples/rag_pipeline/data/uploads" />
+                  <label class="mockup-check-row">
+                    <input id="folderRecurse" type="checkbox" checked />
+                    <span>Recurse into subfolders</span>
+                  </label>
+                  <button class="mockup-send-button mockup-send-button-wide" type="submit">Import Folder</button>
+                </form>
+              </article>
+
+              <article class="mockup-card">
+                <div class="mockup-card-headline">
+                  <h3>Maintenance</h3>
+                </div>
+                <div class="mockup-pill-actions">
+                  <button id="bootstrapButton" class="mockup-action-pill-button" type="button">Bootstrap Schema</button>
+                  <button id="reindexButton" class="mockup-action-pill-button" type="button">Reindex Corpus</button>
+                  <button id="reloadDocuments" class="mockup-action-pill-button" type="button">Reload Inventory</button>
+                </div>
+                <p class="mockup-governance-note">Targeted reindex stays available in the document catalog below.</p>
+              </article>
+            </section>
+
+            <article class="mockup-card mockup-catalog-card">
+              <div class="mockup-card-headline">
+                <h3>Governed Document Catalog</h3>
+                <span id="documentCountBadge" class="mockup-evidence-chip">0 records</span>
+              </div>
+              <div id="documentTable" class="document-table mockup-document-table"></div>
+            </article>
+          </section>
+
+          <aside class="mockup-right-rail">
+            <section class="mockup-metric-grid">
+              <article class="mockup-metric-card">
+                <strong id="documentsCount">0</strong>
+                <span>Documents</span>
+              </article>
+              <article class="mockup-metric-card">
+                <strong id="chunksCount">0</strong>
+                <span>Chunks</span>
+              </article>
+              <article class="mockup-metric-card">
+                <strong id="imagesCount">0</strong>
+                <span>Images</span>
+              </article>
+            </section>
+
+            <article class="mockup-card mockup-insight-card">
+              <div class="mockup-card-headline">
+                <h3>Governance Notes</h3>
+              </div>
+              <ul class="mockup-insight-list">
+                <li>Uploads and bulk imports are isolated from the end-user workspace.</li>
+                <li>Structure-aware parsing and chunking happen during ingestion.</li>
+                <li>Reindexing remains available without exposing admin controls in chat.</li>
+              </ul>
+            </article>
+
+            <article class="mockup-card mockup-history-card">
+              <div class="mockup-card-headline">
+                <h3>Indexed Summary</h3>
+              </div>
+              <div class="mockup-history-list">
+                <div class="mockup-history-row">
+                  <p>Indexed Documents</p>
+                  <span id="indexedCount">0</span>
+                </div>
+                <div class="mockup-history-row">
+                  <p>Upload Status</p>
+                  <span id="governanceStatusBadge">Ready</span>
+                </div>
+              </div>
+            </article>
+          </aside>
+        </section>
+      </main>
+    </div>
+
+    <section id="toast" class="toast hidden"></section>
+  </div>
+
+  <script src="/ui/governance.js?v=20260326i"></script>
+</body>
+</html>

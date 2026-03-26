@@ -1,0 +1,14 @@
+fastapi
+uvicorn[standard]
+python-dotenv
+oracledb
+oci
+pydantic
+pydantic-settings
+openpyxl
+pandas
+python-pptx
+pypdf
+PyMuPDF
+pytest
+python-multipart
