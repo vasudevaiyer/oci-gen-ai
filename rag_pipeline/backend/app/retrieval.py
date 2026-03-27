@@ -21,10 +21,13 @@ class RetrievalService:
         profile = self._query_profile(query)
         search_queries = self._search_queries(query, profile=profile)
         chunk_candidates = self._collect_chunk_candidates(search_queries, top_k=top_k, file_types=file_types)
+        image_candidates: list[dict[str, Any]] = []
+        if include_images:
+            image_candidates = self._collect_image_candidates(search_queries, top_k=top_k, file_types=file_types)
+            chunk_candidates = self._augment_chunk_candidates_from_images(query, chunk_candidates, image_candidates)
         chunk_matches = self._hybrid_rank(query, chunk_candidates, top_k)
         image_matches: list[dict[str, Any]] = []
         if include_images:
-            image_candidates = self._collect_image_candidates(search_queries, top_k=top_k, file_types=file_types)
             image_candidates = self._candidate_images_for_query(query, chunk_matches, image_candidates)
             image_matches = self._rerank_images(query, image_candidates, min(self.settings.max_context_images, top_k))
         return chunk_matches, image_matches
@@ -123,17 +126,71 @@ class RetrievalService:
                     collected[match["image_id"]] = {**match, "matched_queries": existing["matched_queries"]}
         return list(collected.values())
 
+
+    def _augment_chunk_candidates_from_images(
+        self,
+        question: str,
+        chunk_candidates: list[dict[str, Any]],
+        image_candidates: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        if not image_candidates:
+            return chunk_candidates
+
+        chunk_map = {match["chunk_id"]: {**match} for match in chunk_candidates}
+        related_ids: list[str] = []
+        question_variants = [question]
+
+        for image in image_candidates:
+            related_chunk_id = image.get("related_chunk_id")
+            if not related_chunk_id:
+                continue
+            caption_score = _caption_match_score(question_variants, image)
+            support_score = min(0.24, (image["score"] * 0.16) + (caption_score * 0.22))
+            if support_score <= 0.07:
+                continue
+            if related_chunk_id not in chunk_map:
+                related_ids.append(related_chunk_id)
+            existing = chunk_map.get(related_chunk_id)
+            if existing is not None:
+                existing["image_caption_support"] = max(float(existing.get("image_caption_support", 0.0)), support_score)
+
+        if related_ids:
+            for chunk in self.store.get_chunks_by_ids(sorted(set(related_ids))):
+                chunk_map[chunk["chunk_id"]] = {
+                    **chunk,
+                    "matched_queries": [question],
+                    "image_caption_support": 0.0,
+                }
+
+        for image in image_candidates:
+            related_chunk_id = image.get("related_chunk_id")
+            if not related_chunk_id or related_chunk_id not in chunk_map:
+                continue
+            caption_score = _caption_match_score(question_variants, image)
+            support_score = min(0.24, (image["score"] * 0.16) + (caption_score * 0.22))
+            if support_score <= 0.07:
+                continue
+            chunk_map[related_chunk_id]["image_caption_support"] = max(
+                float(chunk_map[related_chunk_id].get("image_caption_support", 0.0)),
+                support_score,
+            )
+
+        return list(chunk_map.values())
+
     def _hybrid_rank(self, question: str, matches: list[dict[str, Any]], top_k: int) -> list[dict[str, Any]]:
         profile = self._query_profile(question)
         ai_rank_bonus = self._ai_rank_bonus(question, matches, limit=max(top_k, min(len(matches), 8)), profile=profile)
         reranked = []
         for match in matches:
             query_variants = [question, *(match.get("matched_queries") or [])]
-            haystack_tokens = _query_tokens(f"{match['title']} {' '.join(match['section_path'])} {match['content']}")
+            haystack_tokens = _query_tokens(
+                f"{match['title']} {' '.join(match['section_path'])} {match['content']} {match['source_path']}"
+            )
             lexical_score = max((len(_query_tokens(variant) & haystack_tokens) / max(len(_query_tokens(variant)), 1)) for variant in query_variants)
             section_tokens = _query_tokens(f"{match['title']} {' '.join(match['section_path'])}")
             section_score = max((len(_query_tokens(variant) & section_tokens) / max(len(_query_tokens(variant)), 1)) for variant in query_variants)
             image_bonus = 0.03 if match.get("image_refs") else 0.0
+            caption_support_bonus = float(match.get("image_caption_support", 0.0))
             matched_query_bonus = min(0.04, 0.015 * max(len(match.get("matched_queries") or []) - 1, 0))
             structure_bonus = _structural_bonus(match, profile)
             answer_shape_bonus = _answer_shape_bonus(match, profile)
@@ -146,6 +203,7 @@ class RetrievalService:
                 + matched_query_bonus
                 + structure_bonus
                 + answer_shape_bonus
+                + caption_support_bonus
                 + ai_rank_bonus.get(match["chunk_id"], 0.0)
                 - generic_penalty
             )
@@ -488,3 +546,15 @@ def _definition_density(title: str, text: str) -> float:
     if len(lines) <= 6:
         score += 0.08
     return score
+
+
+def _caption_match_score(query_variants: list[str], image: dict[str, Any]) -> float:
+    haystack_tokens = _query_tokens(
+        f"{image.get('caption_text', '')} {' '.join(image.get('section_path') or [])} {image.get('source_path', '')}"
+    )
+    if not haystack_tokens:
+        return 0.0
+    return max(
+        (len(_query_tokens(variant) & haystack_tokens) / max(len(_query_tokens(variant)), 1))
+        for variant in query_variants
+    )

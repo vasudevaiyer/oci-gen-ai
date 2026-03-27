@@ -366,6 +366,53 @@ class OracleVectorStore:
                 for row in cursor.fetchall()
             ]
 
+    def get_chunks_by_ids(self, chunk_ids: list[str]) -> list[dict[str, Any]]:
+        if not chunk_ids:
+            return []
+
+        placeholders = []
+        bind_vars: dict[str, Any] = {}
+        for index, chunk_id in enumerate(chunk_ids):
+            key = f"chunk_id_{index}"
+            placeholders.append(f":{key}")
+            bind_vars[key] = chunk_id
+
+        sql = f"""
+            select
+                c.chunk_id,
+                c.document_id,
+                c.source_path,
+                c.title,
+                c.section_path as section_path_json,
+                c.display_text as display_text_value,
+                c.chunk_type,
+                c.image_refs as image_refs_json,
+                c.metadata as metadata_json
+            from rp_chunks c
+            where c.chunk_id in ({', '.join(placeholders)})
+        """
+        with self.connect() as connection:
+            cursor = connection.cursor()
+            cursor.execute(sql, bind_vars)
+            results = []
+            for row in cursor.fetchall():
+                results.append(
+                    {
+                        "chunk_id": row[0],
+                        "document_id": row[1],
+                        "source_path": row[2],
+                        "title": row[3],
+                        "section_path": _load_json_list(row[4]),
+                        "content": _read_clob(row[5]) or "",
+                        "chunk_type": row[6],
+                        "image_refs": _load_json_list(row[7]),
+                        "metadata": _load_json_object(row[8]),
+                        "score": 0.0,
+                    }
+                )
+            return results
+
+
     def corpus_counts(self) -> dict[str, int]:
         with self.connect() as connection:
             cursor = connection.cursor()
@@ -447,3 +494,4 @@ def _to_jsonable(value: Any) -> Any:
     if is_dataclass(value):
         return asdict(value)
     return value
+

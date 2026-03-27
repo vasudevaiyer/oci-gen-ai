@@ -1305,6 +1305,13 @@ textarea:focus {
   margin-bottom: 1.35rem;
 }
 
+.mockup-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: flex-end;
+}
+
 .mockup-main-header-simple {
   justify-content: flex-start;
 }
@@ -1596,6 +1603,12 @@ textarea:focus {
   font-weight: 600;
 }
 
+.mockup-ghost-action:disabled {
+  cursor: default;
+  opacity: 0.55;
+  transform: none;
+}
+
 .mockup-check-row {
   display: flex;
   align-items: center;
@@ -1751,6 +1764,10 @@ textarea:focus {
 .mockup-action-pill-button:hover,
 .mockup-send-button:hover {
   transform: translateY(-1px);
+}
+
+.mockup-ghost-action:disabled:hover {
+  transform: none;
 }
 
 .mockup-form-stack .file-picker {

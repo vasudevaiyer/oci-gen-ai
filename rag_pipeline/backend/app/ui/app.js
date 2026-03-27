@@ -5,6 +5,12 @@ const state = {
   chatHistory: [],
 };
 
+const DEFAULT_EVIDENCE_SUMMARY_ITEMS = [
+  'Primary evidence will appear here after the first answer.',
+  'Only the most relevant supporting sources stay visible.',
+  'The right rail stays lightweight and avoids document-browsing clutter.',
+];
+
 const elements = {
   documentsCount: document.getElementById('documentsCount'),
   chunksCount: document.getElementById('chunksCount'),
@@ -17,6 +23,7 @@ const elements = {
   modalImage: document.getElementById('modalImage'),
   modalCaption: document.getElementById('modalCaption'),
   chatForm: document.getElementById('chatForm'),
+  clearChatButton: document.getElementById('clearChat'),
 };
 
 function showToast(message, isError = false) {
@@ -121,12 +128,29 @@ function renderEvidenceSummary(payload) {
   elements.evidenceSummaryList.innerHTML = items.map((item) => `<li>${escapeHtml(item)}</li>`).join('');
 }
 
+function renderDefaultEvidenceSummary() {
+  if (!elements.evidenceSummaryList) {
+    return;
+  }
+  elements.evidenceSummaryList.innerHTML = DEFAULT_EVIDENCE_SUMMARY_ITEMS
+    .map((item) => `<li>${escapeHtml(item)}</li>`)
+    .join('');
+}
+
+function syncClearChatButton() {
+  if (!elements.clearChatButton) {
+    return;
+  }
+  elements.clearChatButton.disabled = !state.chatHistory.length && !state.recentQueries.length;
+}
+
 function recordRecentQuery(entry) {
   const sourceCount = entry.payload.sources?.length || 0;
   const imageCount = entry.payload.matched_images?.length || 0;
   const summary = imageCount ? `${sourceCount} src · ${imageCount} img` : `${sourceCount} src`;
   state.recentQueries = [{ id: entry.id, question: entry.question, summary }, ...state.recentQueries.filter((item) => item.question !== entry.question)].slice(0, 8);
   renderRecentQueries();
+  syncClearChatButton();
 }
 
 function renderMatchedImages(images) {
@@ -199,6 +223,7 @@ function renderHistory() {
         <p>Start with a question. Grounded answers, supporting sources, and relevant image context will appear here.</p>
       </article>
     `;
+    syncClearChatButton();
     return;
   }
 
@@ -219,6 +244,7 @@ function renderHistory() {
       ${renderMatchedImages(entry.payload.matched_images || [])}
     </section>
   `).join('');
+  syncClearChatButton();
 }
 
 function appendChatResult(payload, question) {
@@ -236,6 +262,25 @@ function appendChatResult(payload, question) {
   if (anchor) {
     anchor.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
+}
+
+function clearChatHistory() {
+  if (!state.chatHistory.length && !state.recentQueries.length) {
+    showToast('Chat is already clear.');
+    return;
+  }
+  state.chatHistory = [];
+  state.recentQueries = [];
+  try {
+    window.sessionStorage.removeItem(SESSION_STORAGE_KEY);
+  } catch (error) {
+    console.warn('Failed to clear chat history', error);
+  }
+  renderHistory();
+  renderRecentQueries();
+  renderDefaultEvidenceSummary();
+  closeImageModal();
+  showToast('Chat cleared.');
 }
 
 async function refreshWorkspace() {
@@ -269,6 +314,10 @@ function scrollToHistoryItem(id) {
 const refreshButton = document.getElementById('refreshAll');
 if (refreshButton) {
   refreshButton.addEventListener('click', () => refreshWorkspace().catch(handleError));
+}
+
+if (elements.clearChatButton) {
+  elements.clearChatButton.addEventListener('click', clearChatHistory);
 }
 
 if (elements.chatForm) {
@@ -337,5 +386,7 @@ renderHistory();
 if (state.chatHistory.length) {
   const latest = state.chatHistory[state.chatHistory.length - 1];
   renderEvidenceSummary(latest.payload);
+} else {
+  renderDefaultEvidenceSummary();
 }
 refreshWorkspace().catch(handleError);
