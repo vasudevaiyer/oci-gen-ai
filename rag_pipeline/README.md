@@ -9,8 +9,8 @@ Self-contained RAG backend for `pdf`, `docx`, `ppt/pptx`, `xls/xlsx`, `txt`, `js
 
 The Resource Manager stack lives in:
 
-- [`rag_pipeline_stack`](/u01/scripts/oci_samples/rag_pipeline_stack)
-- operator guide in [`RESOURCE_MANAGER_STACK.md`](/u01/scripts/oci_samples/rag_pipeline/RESOURCE_MANAGER_STACK.md)
+- [`rag_pipeline_stack`](../rag_pipeline_stack)
+- operator guide in [`RESOURCE_MANAGER_STACK.md`](RESOURCE_MANAGER_STACK.md)
 
 Use that stack when you want OCI to provision:
 

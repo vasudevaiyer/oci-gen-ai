@@ -1,0 +1,300 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+APP_DIR="${app_dir}"
+APP_PORT="${app_listen_port}"
+APP_USER="opc"
+APP_GROUP="opc"
+PYTHON_BIN="/usr/bin/python3.12"
+VENV_DIR="${app_dir}/venv"
+APP_SRC_DIR="${app_dir}/src"
+APP_RUNTIME_DIR="$${APP_SRC_DIR}"
+ENV_FILE="/etc/${replace(app_dir, "/opt/", "")}.env"
+SERVICE_NAME="rag-pipeline"
+
+dnf install -y python3.12 python3.12-pip python3.12-setuptools git curl tar gzip unzip
+
+if systemctl is-active --quiet firewalld || systemctl is-enabled --quiet firewalld; then
+  firewall-cmd --permanent --add-port="${app_listen_port}/tcp" || true
+  firewall-cmd --reload || true
+fi
+
+mkdir -p "$${APP_DIR}"
+mkdir -p "$${APP_SRC_DIR}"
+mkdir -p "$${APP_DIR}/runtime"
+
+if [[ "${app_source_type}" == "git" ]]; then
+  if [[ ! -d "$${APP_SRC_DIR}/.git" ]]; then
+    git clone --depth 1 --branch "${app_source_ref}" "${app_source_url}" "$${APP_SRC_DIR}"
+  else
+    git -C "$${APP_SRC_DIR}" fetch --depth 1 origin "${app_source_ref}"
+    git -C "$${APP_SRC_DIR}" checkout "${app_source_ref}"
+    git -C "$${APP_SRC_DIR}" pull --ff-only origin "${app_source_ref}"
+  fi
+else
+  tmp_archive="$(mktemp)"
+  curl -fsSL "${app_source_url}" -o "$${tmp_archive}"
+  rm -rf "$${APP_SRC_DIR:?}/"*
+  case "${app_source_url}" in
+    *.zip)
+      unzip -q "$${tmp_archive}" -d "$${APP_SRC_DIR}.tmp"
+      first_dir="$(find "$${APP_SRC_DIR}.tmp" -mindepth 1 -maxdepth 1 -type d | head -n1)"
+      cp -R "$${first_dir}/." "$${APP_SRC_DIR}/"
+      rm -rf "$${APP_SRC_DIR}.tmp"
+      ;;
+    *)
+      tar -xzf "$${tmp_archive}" -C "$${APP_SRC_DIR}" --strip-components=1
+      ;;
+  esac
+  rm -f "$${tmp_archive}"
+fi
+
+mkdir -p "$${APP_RUNTIME_DIR}/data/uploads" "$${APP_RUNTIME_DIR}/data/extracted_images"
+
+if [[ -f "$${APP_SRC_DIR}/requirements.txt" ]]; then
+  APP_RUNTIME_DIR="$${APP_SRC_DIR}"
+elif [[ -f "$${APP_SRC_DIR}/rag_pipeline/requirements.txt" ]]; then
+  APP_RUNTIME_DIR="$${APP_SRC_DIR}/rag_pipeline"
+else
+  echo "Could not find requirements.txt in the cloned application source." >&2
+  exit 1
+fi
+
+"$${PYTHON_BIN}" -m venv "$${VENV_DIR}"
+source "$${VENV_DIR}/bin/activate"
+pip install --upgrade pip wheel
+pip install -r "$${APP_RUNTIME_DIR}/requirements.txt"
+
+cat > "$${ENV_FILE}" <<EOF
+APP_NAME=OCI Multi-Format RAG Pipeline
+DATA_DIR=$${APP_RUNTIME_DIR}/data
+UPLOADS_DIR=$${APP_RUNTIME_DIR}/data/uploads
+EXTRACTED_IMAGES_DIR=$${APP_RUNTIME_DIR}/data/extracted_images
+ORACLE_USER=${app_schema_name}
+ORACLE_PASSWORD=${app_schema_password}
+ORACLE_DSN=${adb_connect_string}
+OCI_COMPARTMENT_OCID=${compartment_ocid}
+OCI_GENAI_ENDPOINT=${genai_endpoint}
+OCI_EMBED_MODEL_ID=${embed_model_id}
+OCI_CHAT_MODEL_ID=${chat_model_id}
+OCI_VISION_MODEL_ID=${vision_model_id}
+MAX_CONTEXT_CHUNKS=6
+MAX_CONTEXT_IMAGES=0
+EOF
+
+cat > /etc/systemd/system/$${SERVICE_NAME}.service <<EOF
+[Unit]
+Description=RAG Pipeline API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=$${APP_USER}
+Group=$${APP_GROUP}
+WorkingDirectory=$${APP_RUNTIME_DIR}
+Environment=PYTHONPATH=$${APP_RUNTIME_DIR}
+EnvironmentFile=$${ENV_FILE}
+ExecStart=$${VENV_DIR}/bin/uvicorn backend.app.main:app --host 0.0.0.0 --port ${app_listen_port}
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Patch the downloaded app to use OCI instance principals when no OCI config file exists.
+$${PYTHON_BIN} <<'PY'
+from pathlib import Path
+
+root = Path("${app_dir}/src")
+runtime_dir = root / "rag_pipeline" if (root / "rag_pipeline").exists() else root
+path = runtime_dir / "backend" / "app" / "services" / "cohere_service.py"
+text = path.read_text()
+old = """    def __init__(self, settings: Settings) -> None:
+        self.settings = settings
+        self.config = oci.config.from_file(str(settings.oci_config_path), settings.oci_profile)
+        self.client = GenerativeAiInferenceClient(config=self.config, service_endpoint=settings.oci_endpoint)
+"""
+new = """    def __init__(self, settings: Settings) -> None:
+        self.settings = settings
+        if settings.oci_config_path.exists():
+            self.config = oci.config.from_file(str(settings.oci_config_path), settings.oci_profile)
+            self.client = GenerativeAiInferenceClient(config=self.config, service_endpoint=settings.oci_endpoint)
+        else:
+            signer = oci.auth.signers.InstancePrincipalsSecurityTokenSigner()
+            self.config = {\"region\": getattr(signer, \"region\", \"\")}
+            self.client = GenerativeAiInferenceClient(config={}, signer=signer, service_endpoint=settings.oci_endpoint)
+"""
+if old not in text:
+    raise SystemExit("Expected cohere_service constructor block not found; review downloaded app source.")
+path.write_text(text.replace(old, new))
+PY
+
+# Patch the downloaded app to return a friendly response for GET /api/chat.
+$${PYTHON_BIN} <<'PY'
+from pathlib import Path
+
+root = Path("${app_dir}/src")
+runtime_dir = root / "rag_pipeline" if (root / "rag_pipeline").exists() else root
+path = runtime_dir / "backend" / "app" / "main.py"
+text = path.read_text()
+old = """@app.post("/api/chat", response_model=ChatResponse)
+def chat(request: ChatRequest) -> ChatResponse:
+"""
+new = """@app.get("/api/chat")
+def chat_info() -> dict[str, str]:
+    return {
+        "detail": "Use POST /api/chat with a JSON body containing a question.",
+    }
+
+
+@app.post("/api/chat", response_model=ChatResponse)
+def chat(request: ChatRequest) -> ChatResponse:
+"""
+if old not in text:
+    raise SystemExit("Expected chat endpoint block not found; review downloaded app source.")
+path.write_text(text.replace(old, new))
+PY
+
+# Patch the downloaded app to connect directly to private-endpoint ADB when no wallet is present.
+$${PYTHON_BIN} <<'PY'
+from pathlib import Path
+
+root = Path("${app_dir}/src")
+runtime_dir = root / "rag_pipeline" if (root / "rag_pipeline").exists() else root
+path = runtime_dir / "backend" / "app" / "db.py"
+text = path.read_text()
+old = """    @contextmanager
+    def connect(self):
+        connection = oracledb.connect(
+            user=self.settings.oracle_user,
+            password=self.settings.oracle_password,
+            dsn=self.settings.oracle_dsn,
+            config_dir=str(self.settings.wallet_dir),
+            wallet_location=str(self.settings.wallet_dir),
+            wallet_password=self.settings.wallet_password,
+        )
+        try:
+            yield connection
+        finally:
+            connection.close()
+"""
+new = """    @contextmanager
+    def connect(self):
+        connect_kwargs = {
+            "user": self.settings.oracle_user,
+            "password": self.settings.oracle_password,
+            "dsn": self.settings.oracle_dsn,
+        }
+        if self.settings.wallet_dir.exists() and self.settings.wallet_password:
+            connect_kwargs.update(
+                {
+                    "config_dir": str(self.settings.wallet_dir),
+                    "wallet_location": str(self.settings.wallet_dir),
+                    "wallet_password": self.settings.wallet_password,
+                }
+            )
+        connection = oracledb.connect(**connect_kwargs)
+        try:
+            yield connection
+        finally:
+            connection.close()
+"""
+if old not in text:
+    raise SystemExit("Expected db connect block not found; review downloaded app source.")
+path.write_text(text.replace(old, new))
+PY
+
+chown -R $${APP_USER}:$${APP_GROUP} "$${APP_DIR}" "$${APP_SRC_DIR}" "$${ENV_FILE}"
+chmod 0600 "$${ENV_FILE}"
+
+systemctl daemon-reload
+systemctl enable $${SERVICE_NAME}
+systemctl restart $${SERVICE_NAME}
+
+for _ in {1..30}; do
+  if curl -fsS "http://127.0.0.1:${app_listen_port}/api/health" >/dev/null 2>&1; then
+    break
+  fi
+  sleep 10
+done
+
+# Create the application schema with least-privilege bootstrap grants.
+$${PYTHON_BIN} <<'PY'
+import base64
+import time
+
+import oci
+import oracledb
+from oci.secrets import SecretsClient
+
+dsn = """${adb_connect_string}"""
+schema_name = """${app_schema_name}"""
+schema_password = """${app_schema_password}"""
+secret_ocid = """${adb_admin_password_secret_ocid}"""
+region = """${region}"""
+
+signer = oci.auth.signers.InstancePrincipalsSecurityTokenSigner()
+client = SecretsClient(config={"region": region}, signer=signer)
+plsql = f"""
+DECLARE
+  user_exists NUMBER := 0;
+BEGIN
+  SELECT COUNT(*) INTO user_exists FROM dba_users WHERE username = UPPER('{schema_name}');
+  IF user_exists = 0 THEN
+    EXECUTE IMMEDIATE 'CREATE USER {schema_name} IDENTIFIED BY "{schema_password}"';
+  ELSE
+    EXECUTE IMMEDIATE 'ALTER USER {schema_name} IDENTIFIED BY "{schema_password}"';
+  END IF;
+  EXECUTE IMMEDIATE 'GRANT CREATE SESSION TO {schema_name}';
+  EXECUTE IMMEDIATE 'GRANT CREATE TABLE TO {schema_name}';
+  EXECUTE IMMEDIATE 'GRANT CREATE VIEW TO {schema_name}';
+  EXECUTE IMMEDIATE 'GRANT CREATE SEQUENCE TO {schema_name}';
+  BEGIN
+    EXECUTE IMMEDIATE 'ALTER USER {schema_name} QUOTA UNLIMITED ON DATA';
+  EXCEPTION
+    WHEN OTHERS THEN
+      EXECUTE IMMEDIATE 'GRANT UNLIMITED TABLESPACE TO {schema_name}';
+  END;
+EXCEPTION
+  WHEN OTHERS THEN
+    IF SQLCODE != -955 THEN
+      RAISE;
+    END IF;
+END;
+"""
+
+last_error = None
+for attempt in range(1, 19):
+    try:
+        bundle = client.get_secret_bundle(secret_id=secret_ocid).data
+        admin_password = base64.b64decode(bundle.secret_bundle_content.content).decode("utf-8").strip()
+        connection = oracledb.connect(user="ADMIN", password=admin_password, dsn=dsn)
+        try:
+            cursor = connection.cursor()
+            cursor.execute(plsql)
+            connection.commit()
+            cursor.close()
+        finally:
+            connection.close()
+        print(f"Application schema ensured on attempt {attempt}.")
+        break
+    except Exception as exc:
+        last_error = exc
+        print(f"Schema bootstrap attempt {attempt} failed: {exc}")
+        if attempt == 18:
+            raise
+        time.sleep(20)
+PY
+
+for attempt in {1..18}; do
+  if curl -fsS -X POST "http://127.0.0.1:${app_listen_port}/api/bootstrap" >/dev/null 2>&1; then
+    break
+  fi
+  if [[ "$${attempt}" -eq 18 ]]; then
+    echo "Application bootstrap endpoint did not succeed after multiple attempts." >&2
+    exit 1
+  fi
+  sleep 20
+done

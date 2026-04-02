@@ -1,0 +1,369 @@
+title: "OCI RAG Pipeline"
+description: "Provision the network, Autonomous AI Database, application VM, jump host, Vault secret, and public API Gateway for the OCI RAG Pipeline."
+stackDescription: "Deploys the OCI RAG Pipeline foundation and application bootstrap into a target compartment."
+schemaVersion: "1.1.0"
+version: "1.0.0"
+locale: "en"
+allowViewState: true
+instructions: >
+  Provide the target compartment, tenancy home region, Vault resources, the existing ADB admin password secret,
+  an Oracle Linux image, and the SSH public key for operator access. Resource Manager automatically prepopulates
+  `tenancy_ocid`, `compartment_ocid`, and `region` when those variables exist in the Terraform configuration.
+informationalText: >
+  The application VM and Autonomous Database are provisioned in private subnets. A public jump host and public
+  API Gateway are created for administration and application access.
+troubleshooting: >
+  If the application VM cannot call OCI Generative AI or read secret bundles, verify that the required dynamic-group
+  policies exist in the tenancy home region before running Apply.
+
+variableGroups:
+  - title: "Auto-Populated OCI Context"
+    variables:
+      - ${tenancy_ocid}
+      - ${compartment_ocid}
+      - ${region}
+      - ${home_region}
+  - title: "Secrets And Source"
+    variables:
+      - ${vault_ocid}
+      - ${kms_key_ocid}
+      - ${adb_admin_password_secret_ocid}
+      - ${instance_image_ocid}
+      - ${ssh_public_key}
+      - ${app_source_type}
+      - ${app_source_url}
+      - ${app_source_ref}
+  - title: "Deployment Profile"
+    variables:
+      - ${environment}
+      - ${region_code}
+      - ${app_dynamic_group_enabled}
+      - ${enable_jump_host}
+  - title: "Sizing"
+    variables:
+      - ${vm_shape}
+      - ${vm_ocpus}
+      - ${vm_memory_gbs}
+      - ${jump_host_shape}
+      - ${jump_host_ocpus}
+      - ${jump_host_memory_gbs}
+      - ${adb_compute_count}
+      - ${adb_storage_size_gb}
+      - ${adb_db_version}
+
+variables:
+  tenancy_ocid:
+    type: string
+    title: "Tenancy OCID"
+    description: "Automatically populated by Resource Manager."
+    visible: false
+    required: true
+
+  compartment_ocid:
+    type: oci:identity:compartment:id
+    title: "Target Compartment"
+    description: "Compartment where the stack resources will be created."
+    required: true
+
+  region:
+    type: oci:identity:region:name
+    title: "Deployment Region"
+    description: "Region where the VCN, API Gateway, VM, and Autonomous Database are provisioned."
+    required: true
+
+  home_region:
+    type: oci:identity:region:name
+    title: "Tenancy Home Region"
+    description: "Home region used for IAM objects such as the dynamic group and policy."
+    required: true
+
+  vault_ocid:
+    type: oci:kms:vault:id
+    title: "Vault"
+    description: "Existing Vault that will store the generated application schema password."
+    required: true
+    dependsOn:
+      compartmentId: ${compartment_ocid}
+
+  kms_key_ocid:
+    type: oci:kms:key:id
+    title: "Vault Key"
+    description: "Existing KMS key used to encrypt the generated application schema password secret."
+    required: true
+    dependsOn:
+      compartmentId: ${compartment_ocid}
+      vaultId: ${vault_ocid}
+
+  adb_admin_password_secret_ocid:
+    type: oci:kms:secret:id
+    title: "ADB Admin Password Secret"
+    description: "Existing secret that stores the Autonomous Database ADMIN password."
+    required: true
+    dependsOn:
+      compartmentId: ${compartment_ocid}
+      vaultId: ${vault_ocid}
+
+  instance_image_ocid:
+    type: oci:core:image:id
+    title: "Oracle Linux Image"
+    description: "Base image for the application VM and jump host."
+    required: true
+    dependsOn:
+      compartmentId: ${compartment_ocid}
+
+  ssh_public_key:
+    type: oci:core:ssh:publickey
+    title: "SSH Public Key"
+    description: "Public SSH key for the jump host and private application VM."
+    required: true
+
+  app_source_type:
+    type: enum
+    title: "Application Source Type"
+    required: true
+    default: "git"
+    enum:
+      - "git"
+      - "archive"
+    allowMultiple: false
+
+  app_source_url:
+    type: string
+    title: "Application Source URL"
+    description: "Git clone URL or downloadable archive URL for the application source."
+    required: true
+    default: "https://github.com/vasudevaiyer/oci-gen-ai.git"
+
+  app_source_ref:
+    type: string
+    title: "Application Source Ref"
+    description: "Git branch, tag, or ref to deploy when using a Git source."
+    required: true
+    default: "main"
+
+  environment:
+    type: enum
+    title: "Environment"
+    required: true
+    default: "dev"
+    enum:
+      - "dev"
+      - "test"
+      - "uat"
+      - "prod"
+    allowMultiple: false
+
+  region_code:
+    type: string
+    title: "Region Code"
+    description: "Short naming code, for example `iad`, `phx`, or `ord`."
+    required: true
+    default: "ord"
+
+  app_dynamic_group_enabled:
+    type: boolean
+    title: "Manage Dynamic Group"
+    description: "When enabled, Terraform creates the application dynamic group and policy."
+    required: true
+    default: true
+
+  enable_jump_host:
+    type: boolean
+    title: "Create Jump Host"
+    description: "Creates a public jump host VM for SSH access into the private VCN."
+    required: true
+    default: true
+
+  vm_shape:
+    type: oci:core:instanceshape:name
+    title: "Application VM Shape"
+    required: true
+    default: "VM.Standard.E4.Flex"
+    dependsOn:
+      compartmentId: ${compartment_ocid}
+
+  vm_ocpus:
+    type: integer
+    title: "Application VM OCPUs"
+    required: true
+    default: 2
+    minimum: 1
+
+  vm_memory_gbs:
+    type: integer
+    title: "Application VM Memory (GB)"
+    required: true
+    default: 16
+    minimum: 1
+
+  jump_host_shape:
+    type: oci:core:instanceshape:name
+    title: "Jump Host Shape"
+    required: true
+    default: "VM.Standard.E4.Flex"
+    dependsOn:
+      compartmentId: ${compartment_ocid}
+
+  jump_host_ocpus:
+    type: integer
+    title: "Jump Host OCPUs"
+    required: true
+    default: 1
+    minimum: 1
+
+  jump_host_memory_gbs:
+    type: integer
+    title: "Jump Host Memory (GB)"
+    required: true
+    default: 8
+    minimum: 1
+
+  adb_compute_count:
+    type: integer
+    title: "Autonomous Database ECPUs"
+    required: true
+    default: 2
+    minimum: 2
+
+  adb_storage_size_gb:
+    type: integer
+    title: "Autonomous Database Storage (GB)"
+    required: true
+    default: 50
+    minimum: 20
+
+  adb_db_version:
+    type: string
+    title: "Autonomous Database Version"
+    description: "Use a vector-capable Autonomous AI Database version."
+    required: true
+    default: "26ai"
+
+  prefix:
+    type: string
+    visible: false
+    default: "oci"
+
+  app_name:
+    type: string
+    visible: false
+    default: "rag"
+
+  compartment_name:
+    type: string
+    visible: false
+    default: ""
+
+  vcn_cidr:
+    type: string
+    visible: false
+    default: "10.0.0.0/16"
+
+  api_public_subnet_cidr:
+    type: string
+    visible: false
+    default: "10.0.1.0/24"
+
+  app_private_subnet_cidr:
+    type: string
+    visible: false
+    default: "10.0.2.0/24"
+
+  db_private_subnet_cidr:
+    type: string
+    visible: false
+    default: "10.0.3.0/24"
+
+  allowed_api_cidrs:
+    type: array
+    visible: false
+    default: ["0.0.0.0/0"]
+    items:
+      type: string
+
+  allowed_ssh_cidrs:
+    type: array
+    visible: false
+    default: ["0.0.0.0/0"]
+    items:
+      type: string
+
+  vm_boot_volume_gbs:
+    type: integer
+    visible: false
+    default: 100
+
+  jump_host_boot_volume_gbs:
+    type: integer
+    visible: false
+    default: 50
+
+  app_listen_port:
+    type: integer
+    visible: false
+    default: 8045
+
+  adb_compute_model:
+    type: string
+    visible: false
+    default: "ECPU"
+
+  adb_auto_scaling_enabled:
+    type: boolean
+    visible: false
+    default: true
+
+  adb_license_model:
+    type: string
+    visible: false
+    default: "LICENSE_INCLUDED"
+
+  adb_service_name:
+    type: string
+    visible: false
+    default: "LOW"
+
+  app_schema_name:
+    type: string
+    visible: false
+    default: ""
+
+  genai_endpoint:
+    type: string
+    visible: false
+    default: "https://inference.generativeai.us-chicago-1.oci.oraclecloud.com"
+
+  embed_model_id:
+    type: string
+    visible: false
+    default: "cohere.embed-v4.0"
+
+  chat_model_id:
+    type: string
+    visible: false
+    default: "cohere.command-a-03-2025"
+
+  vision_model_id:
+    type: string
+    visible: false
+    default: "cohere.command-a-vision"
+
+  top_k_default:
+    type: integer
+    visible: false
+    default: 6
+
+  include_images_default:
+    type: boolean
+    visible: false
+    default: false
+
+  enable_health_endpoint:
+    type: boolean
+    visible: false
+    default: true
+
+  freeform_tags:
+    type: object
+    visible: false
+    default: {}
