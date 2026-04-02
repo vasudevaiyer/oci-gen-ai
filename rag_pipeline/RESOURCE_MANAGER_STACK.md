@@ -20,6 +20,39 @@ The design stays intentionally simple:
 
 The stack zip does not bundle the application code itself.
 
+## How To Prepare The Resource Manager Zip
+
+Use one of these two methods:
+
+### Option 1: Build the upload zip from the repo
+
+Create a zip from the `rag_pipeline_stack/` folder only.
+
+Include:
+
+- Terraform files
+- `templates/`
+- `schema.yaml`
+- `.terraform.lock.hcl`
+- `terraform.tfvars.example`
+
+Do not include:
+
+- `.terraform/`
+- `terraform.tfstate`
+- `terraform.tfstate.*`
+- `*.auto.tfvars`
+
+### Option 2: Download from GitHub and re-zip only the stack folder
+
+1. Download the repository zip from GitHub.
+2. Extract it locally.
+3. Open the extracted `rag_pipeline_stack/` folder.
+4. Create a new zip containing only the contents of `rag_pipeline_stack/`.
+5. Make sure state files, `.terraform/`, and customer-specific tfvars are not included.
+
+The OCI Resource Manager upload should contain the stack files at the root of the zip, not wrapped inside an extra parent directory.
+
 ## Required Inputs
 
 Resource Manager auto-populates these OCI context variables when present in Terraform:
@@ -62,7 +95,7 @@ The operator still provides:
 1. Open `Developer Services` -> `Resource Manager` -> `Stacks`.
 2. Click `Create stack`.
 3. Choose `My configuration`.
-4. Upload the sanitized Resource Manager bundle.
+4. Upload the zip prepared from `rag_pipeline_stack/`.
 5. Review the `schema.yaml` guided form.
 6. Confirm the auto-populated OCI values.
 7. Fill in the remaining required values.

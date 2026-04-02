@@ -131,6 +131,34 @@ When creating the Resource Manager upload bundle:
 - exclude `.terraform/`, `terraform.tfstate*`, and any environment-specific `*.auto.tfvars`
 - provide customer-specific values through the Resource Manager stack variables UI instead of bundling them into the zip
 
+## How To Build The Upload Zip
+
+The upload zip for OCI Resource Manager should contain the contents of `rag_pipeline_stack/` at the root of the archive.
+
+### From a local clone
+
+1. Open the `rag_pipeline_stack/` folder.
+2. Create a zip from that folder's contents only.
+3. Verify the zip includes files such as:
+   - `provider.tf`
+   - `variables.tf`
+   - `outputs.tf`
+   - `schema.yaml`
+   - `templates/bootstrap_app.sh.tftpl`
+4. Verify the zip does not include:
+   - `.terraform/`
+   - `terraform.tfstate`
+   - `terraform.tfstate.backup`
+   - `customer.auto.tfvars`
+
+### From GitHub
+
+1. Download the repository source zip.
+2. Extract it locally.
+3. Open the extracted `rag_pipeline_stack/` folder.
+4. Re-zip only the contents of `rag_pipeline_stack/`.
+5. Upload that new zip to OCI Resource Manager.
+
 ## Post-Apply Validation
 
 After apply completes:
