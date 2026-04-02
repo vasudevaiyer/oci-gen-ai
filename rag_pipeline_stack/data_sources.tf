@@ -1,3 +1,9 @@
+data "oci_identity_tenancy" "current" {
+  tenancy_id = var.tenancy_ocid
+}
+
+data "oci_identity_regions" "all" {}
+
 data "oci_identity_compartments" "target" {
   count                     = var.compartment_ocid == "" ? 1 : 0
   compartment_id            = var.tenancy_ocid

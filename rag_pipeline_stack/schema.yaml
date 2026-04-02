@@ -6,9 +6,9 @@ version: "1.0.0"
 locale: "en"
 allowViewState: true
 instructions: >
-  Provide the target compartment, tenancy home region, Vault resources, the existing ADB admin password secret,
+  Provide the target compartment, Vault resources, the existing ADB admin password secret,
   an Oracle Linux image, and the SSH public key for operator access. Resource Manager automatically prepopulates
-  `tenancy_ocid`, `compartment_ocid`, and `region` when those variables exist in the Terraform configuration.
+  `tenancy_ocid`, `compartment_ocid`, and `region`, and the stack derives the tenancy home region automatically.
 informationalText: >
   The application VM and Autonomous Database are provisioned in private subnets. A public jump host and public
   API Gateway are created for administration and application access.
@@ -22,7 +22,6 @@ variableGroups:
       - ${tenancy_ocid}
       - ${compartment_ocid}
       - ${region}
-      - ${home_region}
   - title: "Secrets And Source"
     variables:
       - ${vault_ocid}
@@ -70,12 +69,15 @@ variables:
     title: "Deployment Region"
     description: "Region where the VCN, API Gateway, VM, and Autonomous Database are provisioned."
     required: true
+    visible: false
 
   home_region:
     type: oci:identity:region:name
     title: "Tenancy Home Region"
-    description: "Home region used for IAM objects such as the dynamic group and policy."
-    required: true
+    description: "Optional override. When left empty, the stack derives the tenancy home region automatically."
+    required: false
+    visible: false
+    default: ""
 
   vault_ocid:
     type: oci:kms:vault:id

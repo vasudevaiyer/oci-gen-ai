@@ -62,7 +62,6 @@ Before running this stack, the customer should already have:
 - `tenancy_ocid`
 - `compartment_ocid` or `compartment_name`
 - `region`
-- `home_region`
 - `vault_ocid`
 - `kms_key_ocid`
 - `adb_admin_password_secret_ocid`
@@ -82,8 +81,8 @@ Before running this stack, the customer should already have:
    - `tenancy_ocid`
    - `compartment_ocid`
    - `region`
-5. Provide the remaining required inputs:
-   - `home_region`
+5. Let the stack derive `home_region` automatically from the tenancy unless you need to override it.
+6. Provide the remaining required inputs:
    - `vault_ocid`
    - `kms_key_ocid`
    - `adb_admin_password_secret_ocid`
@@ -92,9 +91,9 @@ Before running this stack, the customer should already have:
    - `app_source_type`
    - `app_source_url`
    - `app_source_ref`
-6. Run `Plan`.
-7. Review the planned infrastructure.
-8. Run `Apply`.
+7. Run `Plan`.
+8. Review the planned infrastructure.
+9. Run `Apply`.
 
 ## Recommended First-Run Values
 

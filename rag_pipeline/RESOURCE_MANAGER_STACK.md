@@ -63,7 +63,6 @@ Resource Manager auto-populates these OCI context variables when present in Terr
 
 The operator still provides:
 
-- `home_region`
 - `vault_ocid`
 - `kms_key_ocid`
 - `adb_admin_password_secret_ocid`
@@ -98,10 +97,11 @@ The operator still provides:
 4. Upload the zip prepared from `rag_pipeline_stack/`.
 5. Review the `schema.yaml` guided form.
 6. Confirm the auto-populated OCI values.
-7. Fill in the remaining required values.
-8. Run `Plan`.
-9. Review the plan.
-10. Run `Apply`.
+7. Let the stack derive the tenancy home region automatically unless an override is needed.
+8. Fill in the remaining required values.
+9. Run `Plan`.
+10. Review the plan.
+11. Run `Apply`.
 
 ## Expected Outputs
 

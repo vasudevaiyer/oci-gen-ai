@@ -1,5 +1,12 @@
 locals {
   resolved_compartment_ocid = var.compartment_ocid != "" ? var.compartment_ocid : one(data.oci_identity_compartments.target[0].compartments).id
+  resolved_home_region = var.home_region != "" ? var.home_region : try(
+    one([
+      for region in data.oci_identity_regions.all.regions : region.name
+      if region.key == data.oci_identity_tenancy.current.home_region_key
+    ]),
+    var.region,
+  )
 
   name_prefix = "${var.prefix}-${var.app_name}-${var.environment}-${var.region_code}"
 

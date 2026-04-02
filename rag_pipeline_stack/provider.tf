@@ -4,5 +4,5 @@ provider "oci" {
 
 provider "oci" {
   alias  = "home"
-  region = var.home_region != "" ? var.home_region : var.region
+  region = local.resolved_home_region
 }
