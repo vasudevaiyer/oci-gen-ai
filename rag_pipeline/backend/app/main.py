@@ -70,14 +70,6 @@ def ui_home() -> FileResponse:
 def governance_home() -> FileResponse:
     return FileResponse(UI_DIR / "governance.html")
 
-@app.get("/mockup", include_in_schema=False)
-def mockup_home() -> FileResponse:
-    return FileResponse(UI_DIR / "mockup.html")
-
-@app.get("/mockup-governance", include_in_schema=False)
-def mockup_governance_home() -> FileResponse:
-    return FileResponse(UI_DIR / "mockup_governance.html")
-
 
 @app.get("/api/health", response_model=HealthResponse)
 def health() -> HealthResponse:

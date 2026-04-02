@@ -4,139 +4,133 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Document Governance | OCI RAG Solution Pack</title>
-  <link rel="stylesheet" href="/ui/styles.css?v=20260327a" />
+  <link rel="stylesheet" href="/ui/styles.css?v=20260402f" />
 </head>
 <body>
-  <div class="mockup-page-shell">
-    <div class="mockup-app-frame reveal">
-      <aside class="mockup-sidebar">
-        <div class="mockup-brand">
-          <div class="mockup-brand-mark">RAG</div>
-          <div>
-            <h1>DocuChat</h1>
-            <p>Governance Console</p>
+  <div class="shell governance-shell">
+    <aside class="panel brand-panel pipeline-brand-panel reveal">
+      <div class="brand-mark">OCI</div>
+      <div class="pipeline-brand-copy">
+        <h1>Governance</h1>
+        <p class="lede">Manage ingestion, document inventory, and reindexing controls in the same workspace language as the chat experience.</p>
+      </div>
+
+      <div class="stat-grid">
+        <article class="stat-card">
+          <span>Documents</span>
+          <strong id="documentsCount">0</strong>
+        </article>
+        <article class="stat-card">
+          <span>Chunks</span>
+          <strong id="chunksCount">0</strong>
+        </article>
+        <article class="stat-card">
+          <span>Images</span>
+          <strong id="imagesCount">0</strong>
+        </article>
+      </div>
+
+      <article class="model-card pipeline-sidecard">
+        <h2>Governance notes</h2>
+        <ul class="pipeline-note-list">
+          <li>Uploads and bulk imports stay separate from the end-user chat flow.</li>
+          <li>Structure-aware parsing and chunking happen during ingestion.</li>
+          <li>Targeted document reindex remains available from the catalog below.</li>
+        </ul>
+      </article>
+
+      <article class="model-card pipeline-sidecard">
+        <h2>Indexed summary</h2>
+        <div class="pipeline-summary-stack">
+          <div class="pipeline-summary-row">
+            <span>Indexed documents</span>
+            <strong id="indexedCount">0</strong>
+          </div>
+          <div class="pipeline-summary-row">
+            <span>Upload status</span>
+            <strong id="governanceStatusBadge">Ready</strong>
           </div>
         </div>
+      </article>
 
-        <div class="mockup-nav-group">
-          <p class="mockup-nav-label">Navigation</p>
-          <a class="mockup-nav-item" href="/">Ask Question</a>
-          <a class="mockup-nav-item mockup-nav-item-active" href="/governance">Governance</a>
-          <a class="mockup-nav-item" href="/mockup-governance">Preview</a>
+      <div class="action-stack">
+        <button id="refreshGovernance" class="primary-button" type="button">Refresh workspace</button>
+        <a class="ghost-button inline-link-button" href="/">Back to chat</a>
+      </div>
+    </aside>
+
+    <main class="panel governance-main-panel reveal">
+      <header class="chat-header">
+        <div>
+          <p class="eyebrow">Operational control</p>
+          <h2>Document Governance</h2>
+          <p class="chat-subtitle">Import files, bootstrap schema assets, and maintain the indexed corpus without leaving the main application surface.</p>
         </div>
-      </aside>
+      </header>
 
-      <main class="mockup-main">
-        <header class="mockup-main-header">
-          <div>
-            <p class="mockup-kicker">Operational control</p>
-            <h2>Document Governance</h2>
-            <p class="mockup-subtitle">Manage ingestion, reindexing, and corpus inventory in a dedicated admin surface.</p>
+      <section class="governance-card-grid">
+        <article class="model-card governance-card">
+          <div class="governance-card-head">
+            <div>
+              <p class="eyebrow">Managed import</p>
+              <h3>Upload Files</h3>
+            </div>
           </div>
-          <button id="refreshGovernance" class="mockup-ghost-action" type="button">Refresh</button>
-        </header>
+          <form id="uploadForm" class="governance-form">
+            <input id="fileInput" class="file-picker" type="file" name="files" multiple />
+            <div id="uploadSelection" class="upload-selection empty-state">No files selected yet.</div>
+            <div id="uploadStatus" class="upload-status" aria-live="polite"></div>
+            <button id="uploadButton" class="primary-button" type="submit">Upload and Index</button>
+          </form>
+        </article>
 
-        <section class="mockup-dashboard-grid mockup-governance-grid">
-          <section class="mockup-chat-stage">
-            <section class="mockup-governance-control-grid">
-              <article class="mockup-card">
-                <div class="mockup-card-headline">
-                  <h3>Upload Files</h3>
-                  <span class="mockup-source-tag">Managed Import</span>
-                </div>
-                <form id="uploadForm" class="mockup-form-stack">
-                  <input id="fileInput" class="file-picker" type="file" name="files" multiple />
-                  <div id="uploadSelection" class="upload-selection empty-state">No files selected yet.</div>
-                  <div id="uploadStatus" class="upload-status" aria-live="polite"></div>
-                  <button id="uploadButton" class="mockup-send-button mockup-send-button-wide" type="submit">Upload and Index</button>
-                </form>
-              </article>
+        <article class="model-card governance-card">
+          <div class="governance-card-head">
+            <div>
+              <p class="eyebrow">Server-side import</p>
+              <h3>Import Existing Folder</h3>
+            </div>
+          </div>
+          <form id="folderForm" class="governance-form">
+            <input id="folderPath" class="governance-text-input" type="text" placeholder="/u01/scripts/oci_samples/rag_pipeline/data/uploads" />
+            <label class="governance-check-row">
+              <input id="folderRecurse" type="checkbox" checked />
+              <span>Recurse into subfolders</span>
+            </label>
+            <button class="secondary-button" type="submit">Import Folder</button>
+          </form>
+        </article>
 
-              <article class="mockup-card">
-                <div class="mockup-card-headline">
-                  <h3>Import Existing Folder</h3>
-                </div>
-                <form id="folderForm" class="mockup-form-stack">
-                  <input id="folderPath" class="mockup-text-input" type="text" placeholder="/u01/scripts/oci_samples/rag_pipeline/data/uploads" />
-                  <label class="mockup-check-row">
-                    <input id="folderRecurse" type="checkbox" checked />
-                    <span>Recurse into subfolders</span>
-                  </label>
-                  <button class="mockup-send-button mockup-send-button-wide" type="submit">Import Folder</button>
-                </form>
-              </article>
+        <article class="model-card governance-card">
+          <div class="governance-card-head">
+            <div>
+              <p class="eyebrow">Maintenance</p>
+              <h3>Corpus Actions</h3>
+            </div>
+          </div>
+          <div class="governance-action-stack">
+            <button id="bootstrapButton" class="secondary-button" type="button">Bootstrap Schema</button>
+            <button id="reindexButton" class="secondary-button" type="button">Reindex Corpus</button>
+            <button id="reloadDocuments" class="ghost-button" type="button">Reload Inventory</button>
+          </div>
+          <p class="lede">Use targeted reindex inside the catalog when only a single document needs to be refreshed.</p>
+        </article>
+      </section>
 
-              <article class="mockup-card">
-                <div class="mockup-card-headline">
-                  <h3>Maintenance</h3>
-                </div>
-                <div class="mockup-pill-actions">
-                  <button id="bootstrapButton" class="mockup-action-pill-button" type="button">Bootstrap Schema</button>
-                  <button id="reindexButton" class="mockup-action-pill-button" type="button">Reindex Corpus</button>
-                  <button id="reloadDocuments" class="mockup-action-pill-button" type="button">Reload Inventory</button>
-                </div>
-                <p class="mockup-governance-note">Targeted reindex stays available in the document catalog below.</p>
-              </article>
-            </section>
-
-            <article class="mockup-card mockup-catalog-card">
-              <div class="mockup-card-headline">
-                <h3>Governed Document Catalog</h3>
-                <span id="documentCountBadge" class="mockup-evidence-chip">0 records</span>
-              </div>
-              <div id="documentTable" class="document-table mockup-document-table"></div>
-            </article>
-          </section>
-
-          <aside class="mockup-right-rail">
-            <section class="mockup-metric-grid">
-              <article class="mockup-metric-card">
-                <strong id="documentsCount">0</strong>
-                <span>Documents</span>
-              </article>
-              <article class="mockup-metric-card">
-                <strong id="chunksCount">0</strong>
-                <span>Chunks</span>
-              </article>
-              <article class="mockup-metric-card">
-                <strong id="imagesCount">0</strong>
-                <span>Images</span>
-              </article>
-            </section>
-
-            <article class="mockup-card mockup-insight-card">
-              <div class="mockup-card-headline">
-                <h3>Governance Notes</h3>
-              </div>
-              <ul class="mockup-insight-list">
-                <li>Uploads and bulk imports are isolated from the end-user workspace.</li>
-                <li>Structure-aware parsing and chunking happen during ingestion.</li>
-                <li>Reindexing remains available without exposing admin controls in chat.</li>
-              </ul>
-            </article>
-
-            <article class="mockup-card mockup-history-card">
-              <div class="mockup-card-headline">
-                <h3>Indexed Summary</h3>
-              </div>
-              <div class="mockup-history-list">
-                <div class="mockup-history-row">
-                  <p>Indexed Documents</p>
-                  <span id="indexedCount">0</span>
-                </div>
-                <div class="mockup-history-row">
-                  <p>Upload Status</p>
-                  <span id="governanceStatusBadge">Ready</span>
-                </div>
-              </div>
-            </article>
-          </aside>
-        </section>
-      </main>
-    </div>
-
-    <section id="toast" class="toast hidden"></section>
+      <article class="model-card governance-catalog-card">
+        <div class="governance-card-head">
+          <div>
+            <p class="eyebrow">Corpus inventory</p>
+            <h3>Governed Document Catalog</h3>
+          </div>
+          <span id="documentCountBadge" class="status-pill">0 records</span>
+        </div>
+        <div id="documentTable" class="document-table governance-document-table"></div>
+      </article>
+    </main>
   </div>
+
+  <section id="toast" class="toast hidden"></section>
 
   <script src="/ui/governance.js?v=20260326i"></script>
 </body>

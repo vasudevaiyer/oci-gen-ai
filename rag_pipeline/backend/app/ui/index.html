@@ -4,117 +4,104 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>OCI RAG Solution Pack</title>
-  <link rel="stylesheet" href="/ui/styles.css?v=20260327a" />
+  <link rel="stylesheet" href="/ui/styles.css?v=20260402f" />
 </head>
 <body>
-  <div class="mockup-page-shell">
-    <div class="mockup-app-frame reveal">
-      <aside class="mockup-sidebar">
-        <div class="mockup-brand">
-          <div class="mockup-brand-mark">RAG</div>
-          <div>
-            <h1>DocuChat</h1>
-            <p>RAG Application</p>
-          </div>
+  <div class="shell pipeline-shell">
+    <aside class="panel brand-panel pipeline-brand-panel reveal">
+      <div class="brand-mark">OCI</div>
+      <div class="pipeline-brand-copy">
+        <h1>RAG Pipeline</h1>
+        <p class="lede">Oracle-backed grounded chat for your indexed corpus, with document evidence and matched visual context.</p>
+      </div>
+
+      <div class="stat-grid">
+        <article class="stat-card">
+          <span>Documents</span>
+          <strong id="documentsCount">0</strong>
+        </article>
+        <article class="stat-card">
+          <span>Chunks</span>
+          <strong id="chunksCount">0</strong>
+        </article>
+        <article class="stat-card">
+          <span>Images</span>
+          <strong id="imagesCount">0</strong>
+        </article>
+      </div>
+
+      <article class="model-card">
+        <h2>Models</h2>
+        <p>Embeddings: <span id="embeddingModel">...</span></p>
+        <p>Chat: <span id="chatModel">...</span></p>
+        <p>Vision: <span id="visionModel">...</span></p>
+      </article>
+
+      <div class="action-stack">
+        <button id="refreshAll" class="primary-button" type="button">Refresh workspace</button>
+        <button id="clearChat" class="secondary-button" type="button">Clear chat</button>
+        <a class="ghost-button inline-link-button" href="/governance">Open governance</a>
+      </div>
+
+      <div class="hint-list">
+        <h2>Starter prompts</h2>
+        <button class="hint-chip" type="button" data-starter-question="Summarize the main topics covered in the indexed corpus.">Summarize the indexed corpus.</button>
+        <button class="hint-chip" type="button" data-starter-question="Which documents are most relevant for getting started, and why?">Which documents should I read first?</button>
+        <button class="hint-chip" type="button" data-starter-question="Find the strongest evidence related to architecture, setup, or deployment guidance.">Show evidence for setup guidance.</button>
+      </div>
+
+      <article class="model-card pipeline-sidecard">
+        <h2>Evidence summary</h2>
+        <ul id="evidenceSummaryList" class="pipeline-note-list">
+          <li>Primary evidence will appear here after the first answer.</li>
+          <li>Only the most relevant supporting sources stay visible.</li>
+          <li>Relevant image matches are called out when they improve grounding.</li>
+        </ul>
+      </article>
+
+      <article id="recentQueriesPanel" class="model-card pipeline-sidecard">
+        <h2>Recent queries</h2>
+        <div id="recentQueries" class="pipeline-recent-list">
+          <div class="empty-state">No questions yet in this session.</div>
         </div>
+      </article>
+    </aside>
 
-        <div class="mockup-nav-group">
-          <p class="mockup-nav-label">Navigation</p>
-          <a class="mockup-nav-item mockup-nav-item-active" href="/">Ask Question</a>
-          <a class="mockup-nav-item" href="/governance">Governance</a>
-          <a class="mockup-nav-item" href="#recentQueriesPanel">History</a>
+    <main class="panel chat-panel pipeline-chat-panel reveal">
+      <header class="chat-header">
+        <div>
+          <p class="eyebrow">OCI-specific workspace</p>
+          <h2>Ask the corpus</h2>
+          <p class="chat-subtitle">Grounded answers stay in the center, while sources and image evidence expand inline with each response.</p>
         </div>
-      </aside>
+        <div class="header-actions">
+          <div id="indexStatusPill" class="status-pill empty">No index</div>
+          <div id="indexedCountPill" class="status-pill">0 indexed docs</div>
+        </div>
+      </header>
 
-      <main class="mockup-main">
-        <header class="mockup-main-header">
-          <div>
-            <p class="mockup-kicker">Chat-first workspace</p>
-            <h2>RAG Application</h2>
-            <p class="mockup-subtitle">Ask questions and get grounded answers from your indexed corpus.</p>
-          </div>
-          <div class="mockup-header-actions">
-            <button id="clearChat" class="mockup-ghost-action" type="button">Clear chat</button>
-            <button id="refreshAll" class="mockup-ghost-action" type="button">Refresh</button>
-          </div>
-        </header>
+      <section id="assistantOutput" class="message-list pipeline-message-list"></section>
 
-        <section class="mockup-dashboard-grid">
-          <section class="mockup-chat-stage">
-            <div id="assistantOutput" class="assistant-output mockup-assistant-output">
-              <article class="mockup-card mockup-answer-card">
-                <div class="mockup-card-headline mockup-answer-headline">
-                  <h3>Answer</h3>
-                  <span class="mockup-confidence-pill">Ready</span>
-                </div>
-                <p>
-                  Start with a question. Grounded answers, supporting sources, and relevant image context will appear here.
-                </p>
-              </article>
-            </div>
-
-            <article class="mockup-card mockup-question-card mockup-question-card-sticky">
-              <div class="mockup-card-headline">
-                <h3>Ask a Question</h3>
-              </div>
-              <form id="chatForm" class="mockup-question-shell mockup-question-form">
-                <textarea id="chatQuestion" class="mockup-question-textarea" rows="3" placeholder="Ask a grounded question about the indexed corpus"></textarea>
-                <input id="chatTopK" type="hidden" value="4" />
-                <input id="chatIncludeImages" type="checkbox" checked hidden />
-                <button class="mockup-send-button" type="submit">Send</button>
-              </form>
-            </article>
-          </section>
-
-          <aside class="mockup-right-rail">
-            <section class="mockup-metric-grid">
-              <article class="mockup-metric-card">
-                <strong id="documentsCount">0</strong>
-                <span>Documents</span>
-              </article>
-              <article class="mockup-metric-card">
-                <strong id="chunksCount">0</strong>
-                <span>Chunks</span>
-              </article>
-              <article class="mockup-metric-card">
-                <strong id="imagesCount">0</strong>
-                <span>Images</span>
-              </article>
-            </section>
-
-            <article class="mockup-card mockup-insight-card">
-              <div class="mockup-card-headline">
-                <h3>Evidence Summary</h3>
-              </div>
-              <ul id="evidenceSummaryList" class="mockup-insight-list">
-                <li>Primary evidence will appear here after the first answer.</li>
-                <li>Only the most relevant supporting sources stay visible.</li>
-                <li>The right rail stays lightweight and avoids document-browsing clutter.</li>
-              </ul>
-            </article>
-
-            <article id="recentQueriesPanel" class="mockup-card mockup-history-card">
-              <div class="mockup-card-headline">
-                <h3>Recent Queries</h3>
-              </div>
-              <div id="recentQueries" class="mockup-history-list">
-                <div class="empty-state">No questions yet in this session.</div>
-              </div>
-            </article>
-          </aside>
-        </section>
-      </main>
-    </div>
-
-    <section id="toast" class="toast hidden"></section>
-
-    <div id="imageModal" class="image-modal hidden">
-      <button id="closeImageModal" class="modal-close">Close</button>
-      <img id="modalImage" alt="Expanded result" />
-      <div id="modalCaption" class="modal-caption"></div>
-    </div>
+      <form id="chatForm" class="composer pipeline-composer">
+        <textarea id="chatQuestion" rows="2" placeholder="Ask a grounded question about the indexed corpus"></textarea>
+        <input id="chatTopK" type="hidden" value="4" />
+        <input id="chatIncludeImages" type="checkbox" checked hidden />
+        <div class="pipeline-composer-footer">
+          <p class="pipeline-composer-note">Responses are grounded in indexed chunks and can include matched images when helpful.</p>
+          <button class="primary-button" type="submit">Send</button>
+        </div>
+      </form>
+    </main>
   </div>
 
-  <script src="/ui/app.js?v=20260327a"></script>
+  <section id="toast" class="toast hidden"></section>
+
+  <div id="imageModal" class="image-modal hidden">
+    <button id="closeImageModal" class="modal-close">Close</button>
+    <img id="modalImage" alt="Expanded result" />
+    <div id="modalCaption" class="modal-caption"></div>
+  </div>
+
+  <script src="/ui/app.js?v=20260402f"></script>
 </body>
 </html>
