@@ -2,6 +2,42 @@
 
 Self-contained RAG backend for `pdf`, `docx`, `ppt/pptx`, `xls/xlsx`, `txt`, `json`, `rst`, and image files with Oracle Database vector search, OCI Generative AI, structure-aware chunking, image extraction, and document-management APIs.
 
+## Deployment Paths
+
+- Local or VM-first runtime from this repo for direct development and testing
+- OCI Resource Manager stack for provisioning the full OCI foundation and bootstrapping the application on a private VM
+
+The Resource Manager stack lives in:
+
+- [`rag_pipeline_stack`](/u01/scripts/oci_samples/rag_pipeline_stack)
+- operator guide in [`RESOURCE_MANAGER_STACK.md`](/u01/scripts/oci_samples/rag_pipeline/RESOURCE_MANAGER_STACK.md)
+
+Use that stack when you want OCI to provision:
+
+- VCN, subnets, NSGs, and gateways
+- private Autonomous AI Database
+- private application VM
+- public jump host
+- public API Gateway
+- generated Vault secret for the application schema password
+
+The current stack design keeps the application source separate from the Resource Manager zip:
+
+- RM zip = Terraform stack bundle
+- `app_source_url` = Git or archive location that the VM pulls during bootstrap
+
+For Resource Manager, upload the sanitized stack bundle and provide the application source URL and ref in the stack variables form.
+
+## Resource Manager Quick Start
+
+1. Create or open a stack in OCI Resource Manager with the bundle from `rag_pipeline_stack`.
+2. Let Resource Manager auto-populate `tenancy_ocid`, `compartment_ocid`, and `region`.
+3. Provide `home_region`, Vault and key, existing ADB admin password secret, image OCID, SSH public key, and application source values.
+4. Run `Plan`, then `Apply`.
+5. After apply, use the outputs for the public UI/API URL and the generated application schema secret.
+
+The stack includes `schema.yaml`, so the Resource Manager variable form is grouped and OCI-aware.
+
 ## Features
 
 - Structure-aware parsing and chunking across supported formats instead of one generic chunking path
