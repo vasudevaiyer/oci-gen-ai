@@ -5,7 +5,7 @@ APP_DIR="${app_dir}"
 APP_PORT="${app_listen_port}"
 APP_USER="opc"
 APP_GROUP="opc"
-PYTHON_BIN="/usr/bin/python3.12"
+SYSTEM_PYTHON="/usr/bin/python3.12"
 VENV_DIR="${app_dir}/venv"
 APP_SRC_DIR="${app_dir}/src"
 APP_RUNTIME_DIR="$${APP_SRC_DIR}"
@@ -60,26 +60,27 @@ else
   exit 1
 fi
 
-"$${PYTHON_BIN}" -m venv "$${VENV_DIR}"
+"$${SYSTEM_PYTHON}" -m venv "$${VENV_DIR}"
 source "$${VENV_DIR}/bin/activate"
+PYTHON_BIN="$${VENV_DIR}/bin/python"
 pip install --upgrade pip wheel
 pip install -r "$${APP_RUNTIME_DIR}/requirements.txt"
 
 cat > "$${ENV_FILE}" <<EOF
-APP_NAME=OCI Multi-Format RAG Pipeline
-DATA_DIR=$${APP_RUNTIME_DIR}/data
-UPLOADS_DIR=$${APP_RUNTIME_DIR}/data/uploads
-EXTRACTED_IMAGES_DIR=$${APP_RUNTIME_DIR}/data/extracted_images
-ORACLE_USER=${app_schema_name}
-ORACLE_PASSWORD=${app_schema_password}
-ORACLE_DSN=${adb_connect_string}
-OCI_COMPARTMENT_OCID=${compartment_ocid}
-OCI_GENAI_ENDPOINT=${genai_endpoint}
-OCI_EMBED_MODEL_ID=${embed_model_id}
-OCI_CHAT_MODEL_ID=${chat_model_id}
-OCI_VISION_MODEL_ID=${vision_model_id}
-MAX_CONTEXT_CHUNKS=6
-MAX_CONTEXT_IMAGES=0
+APP_NAME='OCI Multi-Format RAG Pipeline'
+DATA_DIR='$${APP_RUNTIME_DIR}/data'
+UPLOADS_DIR='$${APP_RUNTIME_DIR}/data/uploads'
+EXTRACTED_IMAGES_DIR='$${APP_RUNTIME_DIR}/data/extracted_images'
+ORACLE_USER='${app_schema_name}'
+ORACLE_PASSWORD='${app_schema_password}'
+ORACLE_DSN='${adb_connect_string}'
+OCI_COMPARTMENT_OCID='${compartment_ocid}'
+OCI_GENAI_ENDPOINT='${genai_endpoint}'
+OCI_EMBED_MODEL_ID='${embed_model_id}'
+OCI_CHAT_MODEL_ID='${chat_model_id}'
+OCI_VISION_MODEL_ID='${vision_model_id}'
+MAX_CONTEXT_CHUNKS='6'
+MAX_CONTEXT_IMAGES='0'
 EOF
 
 cat > /etc/systemd/system/$${SERVICE_NAME}.service <<EOF
@@ -219,6 +220,10 @@ for _ in {1..30}; do
   fi
   sleep 10
 done
+
+# Give newly-created IAM policy and dynamic-group membership a moment to propagate
+# before bootstrap reads Vault secrets with instance principals.
+sleep 10
 
 # Create the application schema with least-privilege bootstrap grants.
 $${PYTHON_BIN} <<'PY'
