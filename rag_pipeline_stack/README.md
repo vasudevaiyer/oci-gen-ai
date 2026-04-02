@@ -147,8 +147,8 @@ After apply completes:
 If the deployment operator cannot create root-tenancy policies, a tenancy IAM admin must create this policy manually in the home region `eu-frankfurt-1`:
 
 ```text
-Allow dynamic-group 'Default'/'oci-rag-dev-ord-app-dg' to use generative-ai-inference-family in compartment id ocid1.compartment.oc1..aaaaaaaa7en7n6s3l2tvz42wo3f25hbr7fz4mm7xinareyi3b73bv7sdl4cq
-Allow dynamic-group 'Default'/'oci-rag-dev-ord-app-dg' to read secret-bundles in compartment id ocid1.compartment.oc1..aaaaaaaa7en7n6s3l2tvz42wo3f25hbr7fz4mm7xinareyi3b73bv7sdl4cq
+Allow dynamic-group 'Default'/'<app_dynamic_group_name>' to use generative-ai-inference-family in compartment id <target_compartment_ocid>
+Allow dynamic-group 'Default'/'<app_dynamic_group_name>' to read secret-bundles in compartment id <target_compartment_ocid>
 ```
 
 After that policy exists, set `app_dynamic_group_enabled = false` for the final Terraform reconciliation if you do not want Terraform to manage the tenancy IAM objects.
