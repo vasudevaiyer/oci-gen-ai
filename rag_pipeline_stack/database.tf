@@ -4,11 +4,18 @@ resource "random_password" "app_schema_password" {
   override_special = "!@#%^*-_=+"
 }
 
+resource "random_string" "app_schema_secret_suffix" {
+  length  = 6
+  upper   = false
+  special = false
+  numeric = true
+}
+
 resource "oci_vault_secret" "app_schema_password" {
   compartment_id = local.resolved_compartment_ocid
   vault_id       = var.vault_ocid
   key_id         = var.kms_key_ocid
-  secret_name    = local.names.app_secret
+  secret_name    = "${local.names.app_secret}-${random_string.app_schema_secret_suffix.result}"
 
   secret_content {
     content      = base64encode(random_password.app_schema_password.result)

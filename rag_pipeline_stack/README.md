@@ -118,6 +118,7 @@ Before running this stack, the customer should already have:
 - This workspace remains separate from the runnable app repo so the current working application is not disturbed.
 - The VM bootstrap creates or rotates the application schema, starts the service, and then delegates table creation to the application's `/api/bootstrap` endpoint.
 - The stack outputs the generated schema secret name and OCID, not the raw password value.
+- The application schema password secret name includes a short random suffix so repeated deployments do not collide with pending-deletion secret names in Vault.
 - Tenancy IAM resources such as dynamic groups and policies are created through the tenancy home region provider.
 - The RAG schema uses Oracle vector columns, so a 19c Autonomous Database is not sufficient for this application.
 - The public API Gateway is configured to route `/`, `/governance`, `/ui/*`, `/assets/*`, `/api/*`, `/chat`, and `/health`.
