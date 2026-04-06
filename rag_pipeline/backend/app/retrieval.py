@@ -248,7 +248,7 @@ class RetrievalService:
         return reranked[:top_k]
 
     def _candidate_images_for_query(self, question: str, chunk_matches: list[dict[str, Any]], image_matches: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        if not image_matches or not chunk_matches:
+        if not chunk_matches:
             return []
 
         intents = self._query_intents(question)
@@ -257,6 +257,11 @@ class RetrievalService:
         top_document_ids = {match["document_id"] for match in top_chunks}
         top_source_paths = {match["source_path"] for match in top_chunks}
         referenced_images = {ref for match in top_chunks for ref in (match.get("image_refs") or [])}
+
+        fallback_images = self._fallback_images_from_chunks(top_chunks)
+
+        if not image_matches:
+            return fallback_images
 
         directly_linked: list[dict[str, Any]] = []
         same_document: list[dict[str, Any]] = []
@@ -274,8 +279,31 @@ class RetrievalService:
         if directly_linked:
             return directly_linked
         if "visual" in intents:
-            return same_document or image_matches
-        return []
+            return same_document or image_matches or fallback_images
+        return fallback_images
+
+    def _fallback_images_from_chunks(self, chunk_matches: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        fallback_images: list[dict[str, Any]] = []
+        seen_paths: set[str] = set()
+        for match in chunk_matches:
+            for index, image_path in enumerate(match.get("image_refs") or []):
+                normalized_path = str(image_path or "").strip()
+                if not normalized_path or normalized_path in seen_paths:
+                    continue
+                seen_paths.add(normalized_path)
+                fallback_images.append(
+                    {
+                        "image_id": f"ref::{normalized_path}",
+                        "document_id": match["document_id"],
+                        "related_chunk_id": match["chunk_id"],
+                        "image_path": normalized_path,
+                        "caption_text": match["title"] or "Relevant visual context",
+                        "source_path": match["source_path"],
+                        "section_path": match["section_path"],
+                        "score": max(float(match.get("score", 0.0)) - (index * 0.01), 0.0),
+                    }
+                )
+        return fallback_images
 
     def _query_intents(self, question: str) -> set[str]:
         cached = self._intent_cache.get(question)

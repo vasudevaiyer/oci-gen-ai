@@ -138,6 +138,7 @@ function renderEvidenceSummary(payload) {
     return;
   }
   const items = [];
+  const visualCount = countVisualEvidence(payload);
   if (payload.sources?.length) {
     const primary = payload.sources[0];
     items.push(`Primary source: ${primary.title} (${primary.source_path.split("/").pop()})`);
@@ -145,8 +146,8 @@ function renderEvidenceSummary(payload) {
   } else {
     items.push("No supporting text sources were returned for this answer.");
   }
-  if (payload.matched_images?.length) {
-    items.push(`${payload.matched_images.length} relevant image match(es) were included.`);
+  if (visualCount) {
+    items.push(`${visualCount} relevant image evidence item(s) were included.`);
   } else {
     items.push("No relevant image evidence was needed for this answer.");
   }
@@ -169,7 +170,7 @@ function syncClearChatButton() {
 
 function recordRecentQuery(entry) {
   const sourceCount = entry.payload.sources?.length || 0;
-  const imageCount = entry.payload.matched_images?.length || 0;
+  const imageCount = countVisualEvidence(entry.payload);
   const summary = imageCount ? `${sourceCount} src · ${imageCount} img` : `${sourceCount} src`;
   state.recentQueries = [
     { id: entry.id, question: entry.question, summary },
@@ -206,6 +207,14 @@ function renderMatchedImages(images) {
         .join("")}
     </div>
   `;
+}
+
+function countVisualEvidence(payload) {
+  const matchedCount = payload.matched_images?.length || 0;
+  const sourceImageCount = new Set(
+    (payload.sources || []).flatMap((source) => source.image_urls || []).filter(Boolean),
+  ).size;
+  return Math.max(matchedCount, sourceImageCount);
 }
 
 function renderSupportingSources(sources) {

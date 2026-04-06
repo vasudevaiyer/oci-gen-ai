@@ -25,7 +25,7 @@ html {
 
 body {
   margin: 0;
-  font-family: "Avenir Next", "Segoe UI", "Helvetica Neue", sans-serif;
+  font-family: "Source Sans 3", "Avenir Next", "Segoe UI", "Helvetica Neue", sans-serif;
   color: var(--text);
   background:
     radial-gradient(circle at top left, rgba(231, 168, 83, 0.22), transparent 28%),
@@ -89,7 +89,7 @@ button {
 .topbar h1,
 .hero h2,
 .section-heading h3 {
-  font-family: "Iowan Old Style", "Palatino Linotype", serif;
+  font-family: "Alegreya", "Iowan Old Style", "Palatino Linotype", serif;
   margin: 0;
   letter-spacing: -0.02em;
 }
@@ -712,7 +712,7 @@ textarea:focus {
 
 .hero-sidecard h3 {
   margin: 0;
-  font-family: "Iowan Old Style", "Palatino Linotype", serif;
+  font-family: "Alegreya", "Iowan Old Style", "Palatino Linotype", serif;
   font-size: 1.5rem;
   line-height: 1.2;
 }
@@ -1317,7 +1317,7 @@ body {
 .vision-card strong,
 .stat-card strong,
 .pipeline-recent-item strong {
-  font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+  font-family: "Alegreya", "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
 }
 
 .pipeline-brand-copy h1,
@@ -1770,7 +1770,7 @@ body {
 .governance-card-head h3 {
   margin: 0;
   font-size: 1.35rem;
-  font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+  font-family: "Alegreya", "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
 }
 
 .governance-form,
@@ -1799,7 +1799,7 @@ body {
 }
 
 .pipeline-summary-row strong {
-  font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+  font-family: "Alegreya", "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
   font-size: 1.1rem;
 }
 
