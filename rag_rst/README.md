@@ -1,0 +1,104 @@
+# Code Aster OCI RAG
+
+An OCI-specific multimodal RAG application for French technical `.rst` documentation. The stack uses:
+
+- OCI Generative AI embeddings with `cohere.embed-v4.0`
+- OCI Generative AI chat with `cohere.command-a-03-2025`
+- Optional image-assisted answers with `cohere.command-a-vision`
+- Oracle AI Database vector columns for chunk and image search
+- FastAPI backend
+- React + Vite frontend
+- KaTeX-based math rendering for formulas and equations in answers and source cards
+
+## Layout
+
+- `backend/app`: FastAPI API, RST parsing, OCI GenAI integration, Oracle vector store
+- `frontend`: React UI
+- `data/extract_docs_code-aster`: source manuals and image assets
+
+## Configure
+
+Use `/u01/venv` for Python and export the required environment variables:
+
+```bash
+source /u01/venv/bin/activate
+export ORACLE_USER=<db_user>
+export ORACLE_PASSWORD='<db_password>'
+export ORACLE_DSN=<oracle_dsn>
+export ORACLE_WALLET_DIR=<wallet_dir>
+export ORACLE_WALLET_PASSWORD=<wallet_password>
+export OCI_CONFIG_PATH=/home/opc/.oci/config
+export OCI_PROFILE=DEFAULT
+export OCI_COMPARTMENT_OCID='<compartment_ocid>'
+```
+
+## Install backend dependencies
+
+```bash
+source /u01/venv/bin/activate
+pip install -r requirements.txt
+```
+
+## Run backend
+
+```bash
+source /u01/venv/bin/activate
+uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+## Run frontend
+
+```bash
+cd frontend
+npm install
+npm run dev -- --host 0.0.0.0 --port 5173
+```
+
+Frontend runtime dependencies include:
+
+- `react`
+- `react-dom`
+- `react-markdown`
+- `remark-math`
+- `rehype-katex`
+- `katex`
+
+## Build frontend for FastAPI serving
+
+```bash
+cd frontend
+npm run build
+```
+
+FastAPI will serve the built app from `frontend/dist` when present.
+
+## Run in background
+
+Copy `rag.env.example` to `rag.env`, fill in the required values, then start the app with:
+
+```bash
+bash rag_service.sh start
+```
+
+The script runs `uvicorn` under `nohup`, stores the PID in `.rag_service.pid`, and writes logs to `logs/rag_service.log`, so the app stays available after logout.
+
+Other commands:
+
+```bash
+bash rag_service.sh status
+bash rag_service.sh stop
+bash rag_service.sh restart
+```
+
+## API
+
+- `GET /api/status`: current corpus counts and configured models
+- `POST /api/ingest`: rebuilds the vector index in the background
+- `POST /api/chat`: answers over the indexed corpus and accepts an optional `image_data_url`
+
+## Notes
+
+- Ingestion rebuilds both the text chunk table and the image table.
+- Image search is implemented with `cohere.embed-v4.0` image embeddings and Oracle AI Database vector similarity.
+- The current parser is structure-aware but lightweight; it uses RST heading conventions, anchors, math directives, and image directives without requiring a separate conversion step.
+- The frontend renders formulas with `react-markdown` + `remark-math` + `rehype-katex` + `katex`, and normalizes RST-style math markers such as `[Math]`, `:label:`, and `:math:\`...\`` for display.

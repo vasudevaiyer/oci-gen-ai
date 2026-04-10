@@ -1,0 +1,8 @@
+.rag_service.pid
+rag.env
+logs/
+data/
+frontend/node_modules/
+frontend/dist/
+backend/**/__pycache__/
+*.log
