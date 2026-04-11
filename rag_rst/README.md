@@ -33,6 +33,27 @@ export OCI_PROFILE=DEFAULT
 export OCI_COMPARTMENT_OCID='<compartment_ocid>'
 ```
 
+## Corpus location for ingestion
+
+The ingestion pipeline reads `.rst` source files from `DATA_DIR`.
+
+- If `DATA_DIR` is set, ingestion uses that folder.
+- If `DATA_DIR` is not set, the default source folder is `data/extract_docs_code-aster`.
+
+Examples:
+
+```bash
+export DATA_DIR=/u01/scripts/oci_samples/rag_rst/data/source
+```
+
+or copy the corpus into:
+
+```text
+/u01/scripts/oci_samples/rag_rst/data/extract_docs_code-aster
+```
+
+Keep the original Sphinx-style folder structure under that directory so nested pages, relative image paths, and document relationships continue to resolve correctly during ingestion.
+
 ## Install backend dependencies
 
 ```bash
