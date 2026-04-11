@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from contextlib import contextmanager
+from datetime import datetime
 
 import oracledb
 
@@ -68,8 +69,58 @@ class OracleVectorStore:
             )
             """,
             "create unique index rag_images_uk on rag_images (image_path)",
+            """
+            create table rag_chat_events (
+                event_id number generated always as identity primary key,
+                asked_at timestamp default current_timestamp,
+                session_id varchar2(128),
+                question_text varchar2(2000) not null,
+                question_normalized varchar2(2000) not null,
+                had_image number(1) default 0 not null,
+                top_k number not null,
+                success number(1) default 1 not null,
+                latency_ms number,
+                answer_model varchar2(256),
+                top_source_path varchar2(1024),
+                top_section_path varchar2(2000),
+                retrieved_count number default 0 not null,
+                error_message varchar2(1000)
+            )
+            """,
+            "create index rag_chat_events_asked_at_ix on rag_chat_events (asked_at)",
+            "create index rag_chat_events_question_ix on rag_chat_events (question_normalized)",
+            "create index rag_chat_events_source_ix on rag_chat_events (top_source_path)",
         ]
+        self._execute_ddl_statements(statements)
 
+    def initialize_analytics_schema(self) -> None:
+        statements = [
+            """
+            create table rag_chat_events (
+                event_id number generated always as identity primary key,
+                asked_at timestamp default current_timestamp,
+                session_id varchar2(128),
+                question_text varchar2(2000) not null,
+                question_normalized varchar2(2000) not null,
+                had_image number(1) default 0 not null,
+                top_k number not null,
+                success number(1) default 1 not null,
+                latency_ms number,
+                answer_model varchar2(256),
+                top_source_path varchar2(1024),
+                top_section_path varchar2(2000),
+                retrieved_count number default 0 not null,
+                error_message varchar2(1000)
+            )
+            """,
+            "create index rag_chat_events_asked_at_ix on rag_chat_events (asked_at)",
+            "create index rag_chat_events_question_ix on rag_chat_events (question_normalized)",
+            "create index rag_chat_events_source_ix on rag_chat_events (top_source_path)",
+        ]
+        self._execute_ddl_statements(statements)
+
+    def _execute_ddl_statements(self, statements: list[str]) -> None:
+        acceptable_codes = {955, 1408, 2261}
         with self.connect() as connection:
             cursor = connection.cursor()
             for statement in statements:
@@ -77,7 +128,7 @@ class OracleVectorStore:
                     cursor.execute(statement)
                 except oracledb.DatabaseError as exc:
                     error_obj = exc.args[0]
-                    if getattr(error_obj, "code", None) not in {955, 2261}:
+                    if getattr(error_obj, "code", None) not in acceptable_codes:
                         raise
             connection.commit()
 
@@ -236,6 +287,224 @@ class OracleVectorStore:
                 counts["documents"] = 0
         return counts
 
+    def log_chat_event(
+        self,
+        *,
+        session_id: str | None,
+        question_text: str,
+        question_normalized: str,
+        had_image: bool,
+        top_k: int,
+        success: bool,
+        latency_ms: int,
+        answer_model: str | None,
+        top_source_path: str | None,
+        top_section_path: str | None,
+        retrieved_count: int,
+        error_message: str | None = None,
+    ) -> None:
+        self.initialize_analytics_schema()
+        with self.connect() as connection:
+            cursor = connection.cursor()
+            cursor.execute(
+                """
+                insert into rag_chat_events (
+                    session_id, question_text, question_normalized, had_image, top_k,
+                    success, latency_ms, answer_model, top_source_path, top_section_path,
+                    retrieved_count, error_message
+                ) values (
+                    :session_id, :question_text, :question_normalized, :had_image, :top_k,
+                    :success, :latency_ms, :answer_model, :top_source_path, :top_section_path,
+                    :retrieved_count, :error_message
+                )
+                """,
+                {
+                    "session_id": session_id,
+                    "question_text": question_text[:2000],
+                    "question_normalized": question_normalized[:2000],
+                    "had_image": 1 if had_image else 0,
+                    "top_k": top_k,
+                    "success": 1 if success else 0,
+                    "latency_ms": latency_ms,
+                    "answer_model": (answer_model or "")[:256] or None,
+                    "top_source_path": (top_source_path or "")[:1024] or None,
+                    "top_section_path": (top_section_path or "")[:2000] or None,
+                    "retrieved_count": retrieved_count,
+                    "error_message": (error_message or "")[:1000] or None,
+                },
+            )
+            connection.commit()
+
+    def analytics_summary(self, *, days: int = 30, top_n: int = 10) -> dict:
+        self.initialize_analytics_schema()
+        with self.connect() as connection:
+            cursor = connection.cursor()
+            cursor.execute(
+                f"""
+                select
+                    count(*) as total_questions,
+                    sum(case when success = 1 then 1 else 0 end) as successful_questions,
+                    sum(case when success = 0 then 1 else 0 end) as failed_questions,
+                    count(distinct question_normalized) as unique_questions,
+                    sum(case when had_image = 1 then 1 else 0 end) as questions_with_images,
+                    avg(latency_ms) as avg_latency_ms
+                from rag_chat_events
+                where asked_at >= current_timestamp - numtodsinterval(:days, 'DAY')
+                """,
+                {"days": days},
+            )
+            row = cursor.fetchone() or (0, 0, 0, 0, 0, None)
+            summary = {
+                "total_questions": int(row[0] or 0),
+                "successful_questions": int(row[1] or 0),
+                "failed_questions": int(row[2] or 0),
+                "unique_questions": int(row[3] or 0),
+                "questions_with_images": int(row[4] or 0),
+                "avg_latency_ms": round(float(row[5] or 0.0), 2),
+            }
+
+            cursor.execute(
+                f"""
+                select
+                    question_normalized,
+                    min(question_text) keep (dense_rank first order by asked_at desc) as question_text,
+                    count(*) as question_count,
+                    max(asked_at) as last_asked_at
+                from rag_chat_events
+                where asked_at >= current_timestamp - numtodsinterval(:days, 'DAY')
+                group by question_normalized
+                order by question_count desc, last_asked_at desc
+                fetch first {int(top_n)} rows only
+                """,
+                {"days": days},
+            )
+            top_questions = [
+                {
+                    "normalized_question": normalized or "",
+                    "question": question or normalized or "",
+                    "count": int(question_count or 0),
+                    "last_asked_at": _timestamp_to_iso(last_asked_at),
+                }
+                for normalized, question, question_count, last_asked_at in cursor.fetchall()
+            ]
+
+            cursor.execute(
+                f"""
+                select
+                    nvl(top_source_path, '(unknown)') as source_path,
+                    nvl(top_section_path, '(unknown)') as section_path,
+                    count(*) as source_count
+                from rag_chat_events
+                where asked_at >= current_timestamp - numtodsinterval(:days, 'DAY')
+                  and success = 1
+                group by top_source_path, top_section_path
+                order by source_count desc, source_path, section_path
+                fetch first {int(top_n)} rows only
+                """,
+                {"days": days},
+            )
+            top_sources = [
+                {
+                    "source_path": source_path,
+                    "section_path": section_path,
+                    "count": int(source_count or 0),
+                }
+                for source_path, section_path, source_count in cursor.fetchall()
+            ]
+
+            cursor.execute(
+                f"""
+                select
+                    to_char(trunc(cast(asked_at as date)), 'YYYY-MM-DD') as asked_day,
+                    count(*) as day_count
+                from rag_chat_events
+                where asked_at >= current_timestamp - numtodsinterval(:days, 'DAY')
+                group by trunc(cast(asked_at as date))
+                order by asked_day
+                """,
+                {"days": days},
+            )
+            daily_counts = [
+                {"day": asked_day, "count": int(day_count or 0)}
+                for asked_day, day_count in cursor.fetchall()
+            ]
+
+        return {
+            **summary,
+            "top_questions": top_questions,
+            "top_sources": top_sources,
+            "daily_counts": daily_counts,
+        }
+
+    def analytics_export_rows(self, *, days: int | None = None) -> list[dict]:
+        self.initialize_analytics_schema()
+        sql = """
+            select
+                asked_at,
+                session_id,
+                question_text,
+                question_normalized,
+                had_image,
+                top_k,
+                success,
+                latency_ms,
+                answer_model,
+                top_source_path,
+                top_section_path,
+                retrieved_count,
+                error_message
+            from rag_chat_events
+        """
+        binds: dict[str, int] = {}
+        if days is not None:
+            sql += " where asked_at >= current_timestamp - numtodsinterval(:days, 'DAY')"
+            binds["days"] = days
+        sql += " order by asked_at desc"
+
+        with self.connect() as connection:
+            cursor = connection.cursor()
+            cursor.execute(sql, binds)
+            rows = cursor.fetchall()
+
+        return [
+            {
+                "asked_at": _timestamp_to_iso(asked_at),
+                "session_id": session_id or "",
+                "question_text": question_text or "",
+                "question_normalized": question_normalized or "",
+                "had_image": "yes" if int(had_image or 0) else "no",
+                "top_k": int(top_k or 0),
+                "success": "yes" if int(success or 0) else "no",
+                "latency_ms": int(latency_ms or 0),
+                "answer_model": answer_model or "",
+                "top_source_path": top_source_path or "",
+                "top_section_path": top_section_path or "",
+                "retrieved_count": int(retrieved_count or 0),
+                "error_message": error_message or "",
+            }
+            for (
+                asked_at,
+                session_id,
+                question_text,
+                question_normalized,
+                had_image,
+                top_k,
+                success,
+                latency_ms,
+                answer_model,
+                top_source_path,
+                top_section_path,
+                retrieved_count,
+                error_message,
+            ) in rows
+        ]
+
 
 def _vector_literal(embedding: list[float]) -> str:
     return "[" + ", ".join(f"{value:.9f}" for value in embedding) + "]"
+
+
+def _timestamp_to_iso(value: datetime | None) -> str:
+    if value is None:
+        return ""
+    return value.isoformat(timespec="seconds")

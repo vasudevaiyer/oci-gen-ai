@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import csv
+import io
 import re
+import time
+from datetime import date
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from .config import get_settings
@@ -12,6 +16,7 @@ from .db import OracleVectorStore
 from .ingestion import IngestionManager
 from .oci_services import OciGenAiService
 from .schemas import (
+    AnalyticsSummary,
     ChatRequest,
     ChatResponse,
     CorpusStatus,
@@ -75,59 +80,131 @@ def ingest(request: IngestRequest, background_tasks: BackgroundTasks) -> IngestR
 
 @app.post("/api/chat", response_model=ChatResponse)
 def chat(request: ChatRequest) -> ChatResponse:
-    counts = store.corpus_counts()
-    if counts.get("chunks", 0) == 0:
-        raise HTTPException(status_code=400, detail="Index is empty. Run ingestion first.")
-
-    query_embedding = genai.embed_texts([request.question], input_type="SEARCH_QUERY")[0]
-    chunk_matches = _hybrid_rank(request.question, store.query_chunks(query_embedding, max(request.top_k * 4, 12)), request.top_k)
+    started_at = time.perf_counter()
+    normalized_question = _normalize_question(request.question)
+    chunk_matches: list[dict] = []
     image_matches: list[dict] = []
-    if request.image_data_url:
-        image_embedding = genai.embed_image_data_urls([request.image_data_url])[0]
-        image_matches = store.query_images(image_embedding, settings.max_context_images)
+    answer_model: str | None = None
+    error_message: str | None = None
+    success = False
 
-    prompt = _build_prompt(request.question, chunk_matches, image_matches)
-    answer, model_id = genai.answer_question(
-        prompt,
-        image_data_url=request.image_data_url,
-        use_vision=bool(request.image_data_url),
-    )
     try:
-        follow_up_questions = genai.generate_follow_up_questions(
-            _build_follow_up_prompt(request.question, answer, chunk_matches, image_matches)
-        )
-    except Exception:
-        follow_up_questions = []
-    if not follow_up_questions:
-        follow_up_questions = _fallback_follow_up_questions(request.question, chunk_matches, image_matches)
+        counts = store.corpus_counts()
+        if counts.get("chunks", 0) == 0:
+            raise HTTPException(status_code=400, detail="Index is empty. Run ingestion first.")
 
-    sources = [
-        SourceItem(
-            source_path=match["source_path"],
-            title=match["title"],
-            section_path=match["section_path"],
-            score=match["score"],
-            excerpt=_build_excerpt(match["content"]),
-            image_urls=[f"/corpus-assets/{ref}" for ref in match["image_refs"]],
+        query_embedding = genai.embed_texts([request.question], input_type="SEARCH_QUERY")[0]
+        chunk_matches = _hybrid_rank(request.question, store.query_chunks(query_embedding, max(request.top_k * 4, 12)), request.top_k)
+        if request.image_data_url:
+            image_embedding = genai.embed_image_data_urls([request.image_data_url])[0]
+            image_matches = store.query_images(image_embedding, settings.max_context_images)
+
+        prompt = _build_prompt(request.question, chunk_matches, image_matches)
+        answer, answer_model = genai.answer_question(
+            prompt,
+            image_data_url=request.image_data_url,
+            use_vision=bool(request.image_data_url),
         )
-        for match in chunk_matches
-    ]
-    matched_images = [
-        ImageMatch(
-            image_url=f"/corpus-assets/{image['image_path']}",
-            caption_text=image["caption_text"][:240],
-            score=image["score"],
-            source_path=image["source_path"],
-            section_path=image["section_path"],
+        try:
+            follow_up_questions = genai.generate_follow_up_questions(
+                _build_follow_up_prompt(request.question, answer, chunk_matches, image_matches)
+            )
+        except Exception:
+            follow_up_questions = []
+        if not follow_up_questions:
+            follow_up_questions = _fallback_follow_up_questions(request.question, chunk_matches, image_matches)
+
+        sources = [
+            SourceItem(
+                source_path=match["source_path"],
+                title=match["title"],
+                section_path=match["section_path"],
+                score=match["score"],
+                excerpt=_build_excerpt(match["content"]),
+                image_urls=[f"/corpus-assets/{ref}" for ref in match["image_refs"]],
+            )
+            for match in chunk_matches
+        ]
+        matched_images = [
+            ImageMatch(
+                image_url=f"/corpus-assets/{image['image_path']}",
+                caption_text=image["caption_text"][:240],
+                score=image["score"],
+                source_path=image["source_path"],
+                section_path=image["section_path"],
+            )
+            for image in image_matches
+        ]
+        success = True
+        return ChatResponse(
+            answer=answer,
+            sources=sources,
+            matched_images=matched_images,
+            follow_up_questions=follow_up_questions,
+            model=answer_model,
         )
-        for image in image_matches
+    except HTTPException as exc:
+        error_message = str(exc.detail)
+        raise
+    except Exception as exc:
+        error_message = str(exc)
+        raise
+    finally:
+        latency_ms = int((time.perf_counter() - started_at) * 1000)
+        top_match = chunk_matches[0] if chunk_matches else {}
+        try:
+            store.log_chat_event(
+                session_id=request.session_id,
+                question_text=request.question,
+                question_normalized=normalized_question,
+                had_image=bool(request.image_data_url),
+                top_k=request.top_k,
+                success=success,
+                latency_ms=latency_ms,
+                answer_model=answer_model,
+                top_source_path=top_match.get("source_path"),
+                top_section_path=top_match.get("section_path"),
+                retrieved_count=len(chunk_matches),
+                error_message=error_message,
+            )
+        except Exception:
+            pass
+
+
+@app.get("/api/analytics/summary", response_model=AnalyticsSummary)
+def analytics_summary(days: int = 30, top_n: int = 10) -> AnalyticsSummary:
+    return AnalyticsSummary(**store.analytics_summary(days=days, top_n=top_n))
+
+
+@app.get("/api/analytics/export")
+def analytics_export(days: int | None = None) -> StreamingResponse:
+    rows = store.analytics_export_rows(days=days)
+    output = io.StringIO()
+    output.write("\ufeff")
+    fieldnames = [
+        "asked_at",
+        "session_id",
+        "question_text",
+        "question_normalized",
+        "had_image",
+        "top_k",
+        "success",
+        "latency_ms",
+        "answer_model",
+        "top_source_path",
+        "top_section_path",
+        "retrieved_count",
+        "error_message",
     ]
-    return ChatResponse(
-        answer=answer,
-        sources=sources,
-        matched_images=matched_images,
-        follow_up_questions=follow_up_questions,
-        model=model_id,
+    writer = csv.DictWriter(output, fieldnames=fieldnames)
+    writer.writeheader()
+    writer.writerows(rows)
+    label = f"last-{days}-days" if days is not None else "all-time"
+    filename = f"rag-analytics-{label}-{date.today().isoformat()}.csv"
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
 
@@ -248,6 +325,12 @@ def _hybrid_rank(question: str, matches: list[dict], top_k: int) -> list[dict]:
         reranked.append({**match, "score": combined})
     reranked.sort(key=lambda item: item["score"], reverse=True)
     return reranked[:top_k]
+
+
+def _normalize_question(question: str) -> str:
+    lowered = question.lower()
+    lowered = re.sub(r"[^\w\s]+", " ", lowered, flags=re.UNICODE)
+    return re.sub(r"\s+", " ", lowered).strip()
 
 
 @app.get("/{full_path:path}")

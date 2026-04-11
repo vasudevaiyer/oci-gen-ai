@@ -11,6 +11,17 @@ const starterQuestions = [
   "Trouver un test de validation d'une analyse thermo-mécanique d'un tuyau."
 ];
 
+function getSessionId() {
+  const storageKey = "rag-session-id";
+  const existing = window.localStorage.getItem(storageKey);
+  if (existing) {
+    return existing;
+  }
+  const created = `web-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  window.localStorage.setItem(storageKey, created);
+  return created;
+}
+
 function toDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -101,6 +112,7 @@ function MessageBody({ content, renderMarkdown = false }) {
 export default function App() {
   const [theme, setTheme] = useState("light");
   const [status, setStatus] = useState(null);
+  const [analytics, setAnalytics] = useState(null);
   const [messages, setMessages] = useState([
     {
       role: "assistant",
@@ -123,9 +135,22 @@ export default function App() {
     setIngesting(payload.ingest_running);
   }
 
+  async function loadAnalytics() {
+    const response = await fetch("/api/analytics/summary?days=30&top_n=6");
+    if (!response.ok) {
+      return;
+    }
+    const payload = await response.json();
+    setAnalytics(payload);
+  }
+
   useEffect(() => {
     loadStatus();
-    const timer = window.setInterval(loadStatus, 5000);
+    loadAnalytics();
+    const timer = window.setInterval(() => {
+      loadStatus();
+      loadAnalytics();
+    }, 5000);
     return () => window.clearInterval(timer);
   }, []);
 
@@ -181,7 +206,8 @@ export default function App() {
         body: JSON.stringify({
           question: prompt,
           top_k: 6,
-          image_data_url: imageDataUrl
+          image_data_url: imageDataUrl,
+          session_id: getSessionId()
         })
       });
       const payload = await response.json();
@@ -200,6 +226,7 @@ export default function App() {
         }
       ]);
       await loadStatus();
+      await loadAnalytics();
     } catch (error) {
       setMessages((existing) => [
         ...existing,
@@ -229,6 +256,11 @@ export default function App() {
     ]);
     setQuestion("");
     setImageFile(null);
+  }
+
+  function downloadAnalytics(days) {
+    const suffix = typeof days === "number" ? `?days=${days}` : "";
+    window.open(`/api/analytics/export${suffix}`, "_blank", "noopener,noreferrer");
   }
 
   return (
@@ -261,6 +293,9 @@ export default function App() {
           <button className="primary-button" onClick={runIngest} disabled={ingesting}>
             {ingesting ? "Indexing..." : "Rebuild Index"}
           </button>
+          <button className="secondary-button" onClick={() => downloadAnalytics(30)}>
+            Export 30d CSV
+          </button>
           <button className="secondary-button" onClick={() => setTheme(theme === "light" ? "dark" : "light")}>
             {theme === "light" ? "Dark Mode" : "Light Mode"}
           </button>
@@ -276,6 +311,67 @@ export default function App() {
               {item}
             </button>
           ))}
+        </div>
+
+        <div className="analytics-card">
+          <div className="analytics-heading">
+            <h2>Usage analytics</h2>
+            <span>Last 30 days</span>
+          </div>
+          <div className="analytics-mini-grid">
+            <div className="analytics-mini-card">
+              <span>Total questions</span>
+              <strong>{analytics?.total_questions ?? 0}</strong>
+            </div>
+            <div className="analytics-mini-card">
+              <span>Unique</span>
+              <strong>{analytics?.unique_questions ?? 0}</strong>
+            </div>
+            <div className="analytics-mini-card">
+              <span>With images</span>
+              <strong>{analytics?.questions_with_images ?? 0}</strong>
+            </div>
+            <div className="analytics-mini-card">
+              <span>Avg latency</span>
+              <strong>{Math.round(analytics?.avg_latency_ms ?? 0)} ms</strong>
+            </div>
+          </div>
+
+          <div className="analytics-section">
+            <div className="analytics-section-title">Top questions</div>
+            <div className="analytics-list">
+              {analytics?.top_questions?.length ? (
+                analytics.top_questions.map((item) => (
+                  <button
+                    key={`${item.normalized_question}-${item.last_asked_at}`}
+                    className="analytics-item"
+                    onClick={() => ask(item.question)}
+                  >
+                    <span>{item.question}</span>
+                    <strong>{item.count}</strong>
+                  </button>
+                ))
+              ) : (
+                <div className="analytics-empty">No questions logged yet.</div>
+              )}
+            </div>
+          </div>
+
+          <div className="analytics-section">
+            <div className="analytics-section-title">Top source paths</div>
+            <div className="analytics-list">
+              {analytics?.top_sources?.length ? (
+                analytics.top_sources.map((item) => (
+                  <div key={`${item.source_path}-${item.section_path}`} className="analytics-item static">
+                    <span>{item.source_path}</span>
+                    <strong>{item.count}</strong>
+                  </div>
+                ))
+              ) : (
+                <div className="analytics-empty">No source usage yet.</div>
+              )}
+            </div>
+          </div>
         </div>
       </aside>
 

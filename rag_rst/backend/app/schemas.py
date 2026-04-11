@@ -35,6 +35,7 @@ class ChatRequest(BaseModel):
     question: str = Field(..., min_length=3)
     top_k: int = Field(default=6, ge=2, le=12)
     image_data_url: str | None = None
+    session_id: str | None = Field(default=None, max_length=128)
 
 
 class SourceItem(BaseModel):
@@ -78,3 +79,33 @@ class CorpusStatus(BaseModel):
     ingest_running: bool
     models: dict[str, str]
     stats: dict[str, Any] = Field(default_factory=dict)
+
+
+class AnalyticsTopQuestion(BaseModel):
+    question: str
+    normalized_question: str
+    count: int
+    last_asked_at: str
+
+
+class AnalyticsTopSource(BaseModel):
+    source_path: str
+    section_path: str
+    count: int
+
+
+class AnalyticsDailyCount(BaseModel):
+    day: str
+    count: int
+
+
+class AnalyticsSummary(BaseModel):
+    total_questions: int
+    successful_questions: int
+    failed_questions: int
+    unique_questions: int
+    questions_with_images: int
+    avg_latency_ms: float
+    top_questions: list[AnalyticsTopQuestion] = Field(default_factory=list)
+    top_sources: list[AnalyticsTopSource] = Field(default_factory=list)
+    daily_counts: list[AnalyticsDailyCount] = Field(default_factory=list)
