@@ -6,6 +6,7 @@ An OCI-specific multimodal RAG application for French technical `.rst` documenta
 - OCI Generative AI chat with `cohere.command-a-03-2025`
 - Optional image-assisted answers with `cohere.command-a-vision`
 - Oracle AI Database vector columns for chunk and image search
+- Oracle AI Database analytics table for chat usage reporting
 - FastAPI backend
 - React + Vite frontend
 - KaTeX-based math rendering for formulas and equations in answers and source cards
@@ -95,10 +96,29 @@ bash rag_service.sh restart
 - `GET /api/status`: current corpus counts and configured models
 - `POST /api/ingest`: rebuilds the vector index in the background
 - `POST /api/chat`: answers over the indexed corpus and accepts an optional `image_data_url`
+- `GET /api/analytics/summary`: usage analytics summary for recent chat activity
+- `GET /api/analytics/export`: exports chat usage events as CSV for Excel/download
+
+## Usage analytics
+
+The UI includes a `Usage analytics` panel in the left sidebar. It shows:
+
+- total questions
+- unique normalized questions
+- questions asked with images
+- average latency
+- top repeated questions
+- top source paths used in answers
+
+The `Export 30d CSV` action downloads recent analytics in CSV format, which can be opened directly in Excel.
+
+Analytics logging starts from new chat requests after this version is deployed.
 
 ## Notes
 
 - Ingestion rebuilds both the text chunk table and the image table.
+- Schema initialization now creates `rag_chunks`, `rag_images`, and `rag_chat_events`.
+- Analytics schema also has a lazy fallback initializer, so the analytics table is created on first chat/analytics use even if a fresh ingestion has not been run yet.
 - Image search is implemented with `cohere.embed-v4.0` image embeddings and Oracle AI Database vector similarity.
 - The current parser is structure-aware but lightweight; it uses RST heading conventions, anchors, math directives, and image directives without requiring a separate conversion step.
 - The frontend renders formulas with `react-markdown` + `remark-math` + `rehype-katex` + `katex`, and normalizes RST-style math markers such as `[Math]`, `:label:`, and `:math:\`...\`` for display.
