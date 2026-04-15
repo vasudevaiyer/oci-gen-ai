@@ -1,0 +1,10 @@
+/.codex
+/.rag_service.pid
+/rag.env
+/logs/
+/frontend/node_modules
+/frontend/node_modules/
+/frontend/dist/
+/backend/**/__pycache__/
+*.log
+/IA_Arabic_Policy.pdf
