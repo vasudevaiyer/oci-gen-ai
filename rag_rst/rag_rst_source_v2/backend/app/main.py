@@ -1,0 +1,401 @@
+from __future__ import annotations
+
+import csv
+import io
+import re
+import time
+from datetime import date
+
+from fastapi import BackgroundTasks, FastAPI, Header, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
+
+from .config import get_settings
+from .db import OracleVectorStore
+from .ingestion import IngestionManager
+from .oci_services import OciGenAiService
+from .schemas import (
+    AnalyticsSummary,
+    ChatRequest,
+    ChatResponse,
+    CorpusStatus,
+    ImageMatch,
+    IngestRequest,
+    IngestResponse,
+    SourceItem,
+)
+
+
+settings = get_settings()
+store = OracleVectorStore(settings)
+genai = OciGenAiService(settings)
+ingestion = IngestionManager(settings, store, genai)
+app = FastAPI(title=settings.app_name)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.mount("/corpus-assets", StaticFiles(directory=settings.static_mount_dir), name="corpus-assets")
+
+
+@app.get("/api/health")
+def health() -> dict[str, str]:
+    return {"status": "ok"}
+
+
+@app.get("/api/public-status")
+def public_status() -> dict[str, object]:
+    status = _build_corpus_status()
+    return {
+        "indexed": status.chunks > 0,
+        "ingest_running": status.ingest_running,
+        "phase": status.stats.get("phase"),
+    }
+
+
+@app.get("/api/admin/status", response_model=CorpusStatus)
+def admin_status(x_admin_token: str | None = Header(default=None)) -> CorpusStatus:
+    _require_admin(x_admin_token)
+    return _build_corpus_status()
+
+
+@app.get("/api/status", response_model=CorpusStatus)
+def status(x_admin_token: str | None = Header(default=None)) -> CorpusStatus:
+    _require_admin(x_admin_token)
+    return _build_corpus_status()
+
+
+def _build_corpus_status() -> CorpusStatus:
+    try:
+        counts = store.corpus_counts()
+    except Exception:
+        counts = {"chunks": 0, "images": 0, "documents": 0}
+    return CorpusStatus(
+        chunks=counts.get("chunks", 0),
+        images=counts.get("images", 0),
+        documents=counts.get("documents", 0),
+        ingest_running=ingestion.running,
+        models={
+            "embedding": settings.embedding_model_id,
+            "chat": settings.chat_model_id,
+            "vision": settings.vision_model_id,
+        },
+        stats=ingestion.last_stats,
+    )
+
+
+@app.post("/api/ingest", response_model=IngestResponse)
+def ingest(
+    request: IngestRequest,
+    background_tasks: BackgroundTasks,
+    x_admin_token: str | None = Header(default=None),
+) -> IngestResponse:
+    _require_admin(x_admin_token)
+    if ingestion.running:
+        return IngestResponse(status="running", detail="Ingestion is already in progress.")
+    if not request.rebuild:
+        return IngestResponse(status="ignored", detail="Only full rebuild is implemented in this version.")
+    background_tasks.add_task(ingestion.rebuild_index)
+    return IngestResponse(status="started", detail="Ingestion started in the background.")
+
+
+@app.post("/api/chat", response_model=ChatResponse)
+def chat(request: ChatRequest) -> ChatResponse:
+    started_at = time.perf_counter()
+    normalized_question = _normalize_question(request.question)
+    chunk_matches: list[dict] = []
+    image_matches: list[dict] = []
+    answer_model: str | None = None
+    error_message: str | None = None
+    success = False
+
+    try:
+        counts = store.corpus_counts()
+        if counts.get("chunks", 0) == 0:
+            raise HTTPException(status_code=400, detail="Index is empty. Run ingestion first.")
+
+        query_embedding = genai.embed_texts([request.question], input_type="SEARCH_QUERY")[0]
+        chunk_matches = _hybrid_rank(request.question, store.query_chunks(query_embedding, max(request.top_k * 4, 12)), request.top_k)
+        if request.image_data_url:
+            image_embedding = genai.embed_image_data_urls([request.image_data_url])[0]
+            image_matches = store.query_images(image_embedding, settings.max_context_images)
+
+        prompt = _build_prompt(request.question, chunk_matches, image_matches)
+        answer, answer_model = genai.answer_question(
+            prompt,
+            image_data_url=request.image_data_url,
+            use_vision=bool(request.image_data_url),
+        )
+        try:
+            follow_up_questions = genai.generate_follow_up_questions(
+                _build_follow_up_prompt(request.question, answer, chunk_matches, image_matches)
+            )
+        except Exception:
+            follow_up_questions = []
+        if not follow_up_questions:
+            follow_up_questions = _fallback_follow_up_questions(request.question, chunk_matches, image_matches)
+
+        sources = [
+            SourceItem(
+                source_path=match["source_path"],
+                title=match["title"],
+                section_path=match["section_path"],
+                score=match["score"],
+                excerpt=_build_excerpt(match["content"]),
+                image_urls=[f"/corpus-assets/{ref}" for ref in match["image_refs"]],
+            )
+            for match in chunk_matches
+        ]
+        matched_images = [
+            ImageMatch(
+                image_url=f"/corpus-assets/{image['image_path']}",
+                caption_text=image["caption_text"][:240],
+                score=image["score"],
+                source_path=image["source_path"],
+                section_path=image["section_path"],
+            )
+            for image in image_matches
+        ]
+        success = True
+        return ChatResponse(
+            answer=answer,
+            sources=sources,
+            matched_images=matched_images,
+            follow_up_questions=follow_up_questions,
+            model=answer_model,
+        )
+    except HTTPException as exc:
+        error_message = str(exc.detail)
+        raise
+    except Exception as exc:
+        error_message = str(exc)
+        raise
+    finally:
+        latency_ms = int((time.perf_counter() - started_at) * 1000)
+        top_match = chunk_matches[0] if chunk_matches else {}
+        try:
+            store.log_chat_event(
+                session_id=request.session_id,
+                question_text=request.question,
+                question_normalized=normalized_question,
+                had_image=bool(request.image_data_url),
+                top_k=request.top_k,
+                success=success,
+                latency_ms=latency_ms,
+                answer_model=answer_model,
+                top_source_path=top_match.get("source_path"),
+                top_section_path=top_match.get("section_path"),
+                retrieved_count=len(chunk_matches),
+                error_message=error_message,
+            )
+        except Exception:
+            pass
+
+
+@app.get("/api/analytics/summary", response_model=AnalyticsSummary)
+def analytics_summary(days: int = 30, top_n: int = 10, x_admin_token: str | None = Header(default=None)) -> AnalyticsSummary:
+    _require_admin(x_admin_token)
+    return AnalyticsSummary(**store.analytics_summary(days=days, top_n=top_n))
+
+
+@app.get("/api/analytics/export")
+def analytics_export(days: int | None = None, x_admin_token: str | None = Header(default=None)) -> StreamingResponse:
+    _require_admin(x_admin_token)
+    rows = store.analytics_export_rows(days=days)
+    output = io.StringIO()
+    output.write("\ufeff")
+    fieldnames = [
+        "asked_at",
+        "session_id",
+        "question_text",
+        "question_normalized",
+        "had_image",
+        "top_k",
+        "success",
+        "latency_ms",
+        "answer_model",
+        "top_source_path",
+        "top_section_path",
+        "retrieved_count",
+        "error_message",
+    ]
+    writer = csv.DictWriter(output, fieldnames=fieldnames)
+    writer.writeheader()
+    writer.writerows(rows)
+    label = f"last-{days}-days" if days is not None else "all-time"
+    filename = f"rag-analytics-{label}-{date.today().isoformat()}.csv"
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@app.get("/api/admin/status", response_model=CorpusStatus)
+def admin_status(x_admin_token: str | None = Header(default=None)) -> CorpusStatus:
+    return status(x_admin_token)
+
+
+@app.post("/api/admin/ingest", response_model=IngestResponse)
+def admin_ingest(request: IngestRequest, background_tasks: BackgroundTasks, x_admin_token: str | None = Header(default=None)) -> IngestResponse:
+    return ingest(request, background_tasks, x_admin_token)
+
+
+@app.get("/api/admin/analytics/summary", response_model=AnalyticsSummary)
+def admin_analytics_summary(days: int = 30, top_n: int = 10, x_admin_token: str | None = Header(default=None)) -> AnalyticsSummary:
+    return analytics_summary(days, top_n, x_admin_token)
+
+
+@app.get("/api/admin/analytics/export")
+def admin_analytics_export(days: int | None = None, x_admin_token: str | None = Header(default=None)) -> StreamingResponse:
+    return analytics_export(days, x_admin_token)
+
+
+def _build_prompt(question: str, chunk_matches: list[dict], image_matches: list[dict]) -> str:
+    context_blocks = []
+    for index, match in enumerate(chunk_matches, start=1):
+        context_blocks.append(
+            f"[S{index}] {match['title']} | {match['section_path']} | {match['source_path']}\n{match['content']}"
+        )
+    context_section = "\n\n".join(context_blocks)
+    image_blocks = []
+    for index, image in enumerate(image_matches, start=1):
+        image_blocks.append(
+            f"[I{index}] {image['source_path']} | {image['section_path']} | {image['image_path']}\n{image['caption_text']}"
+        )
+    image_section = "\n\nImages similaires:\n" + "\n\n".join(image_blocks) if image_blocks else ""
+    return (
+        "Question utilisateur:\n"
+        f"{question}\n\n"
+        "Contexte récupéré:\n"
+        f"{context_section}"
+        f"{image_section}\n\n"
+        "Réponds dans la langue de la question. "
+        "Quand tu affiches une formule, utilise la syntaxe LaTeX compatible Markdown: "
+        "$...$ pour l'inline et $$...$$ pour une équation sur sa propre ligne. "
+        "Si une information vient du contexte, cite sa source avec [Sx] ou [Ix]."
+    )
+
+
+def _build_follow_up_prompt(question: str, answer: str, chunk_matches: list[dict], image_matches: list[dict]) -> str:
+    source_lines = [
+        f"- {match['title']} | {match['section_path']} | {match['source_path']}"
+        for match in chunk_matches[:3]
+    ]
+    image_lines = [
+        f"- {image['section_path']} | {image['image_path']}"
+        for image in image_matches[:2]
+    ]
+    source_section = "\n".join(source_lines) if source_lines else "- Aucun"
+    image_section = "\n".join(image_lines) if image_lines else "- Aucune"
+    return (
+        "Generate 3 concise follow-up questions for a documentation chat assistant.\n"
+        "Keep them specific to the current topic and useful for the next user click.\n"
+        "Avoid repeating the original question.\n"
+        "Write the questions in the same language as the user's question.\n\n"
+        f"User question:\n{question}\n\n"
+        f"Assistant answer:\n{answer}\n\n"
+        f"Top text sources:\n{source_section}\n\n"
+        f"Top image matches:\n{image_section}"
+    )
+
+
+def _build_excerpt(content: str, limit: int = 900) -> str:
+    cleaned = content.strip()
+    if len(cleaned) <= limit:
+        return cleaned
+
+    cut = cleaned.rfind("\n\n", 0, limit)
+    if cut >= int(limit * 0.6):
+        excerpt = cleaned[:cut]
+    else:
+        cut = cleaned.rfind(" ", 0, limit)
+        excerpt = cleaned[: cut if cut > 0 else limit]
+
+    return excerpt.rstrip() + " ..."
+
+
+def _fallback_follow_up_questions(question: str, chunk_matches: list[dict], image_matches: list[dict]) -> list[str]:
+    follow_ups: list[str] = []
+    seen: set[str] = set()
+    lower_question = question.lower()
+
+    for match in chunk_matches[:3]:
+        title = match["title"].strip()
+        section_path = match["section_path"].strip()
+        candidates = [
+            f"Can you summarize the section '{title}'?",
+            f"What are the key points in '{section_path}'?",
+        ]
+        for candidate in candidates:
+            normalized = candidate.casefold()
+            if normalized in seen or candidate.lower() == lower_question:
+                continue
+            seen.add(normalized)
+            follow_ups.append(candidate)
+            if len(follow_ups) >= 3:
+                return follow_ups
+
+    if image_matches:
+        candidate = "Can you explain the related figures or images for this topic?"
+        if candidate.casefold() not in seen:
+            follow_ups.append(candidate)
+
+    generic_candidates = [
+        "Can you give a step-by-step explanation?",
+        "Which related section should I read next?",
+        "What are the limitations or assumptions of this method?",
+    ]
+    for candidate in generic_candidates:
+        normalized = candidate.casefold()
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        follow_ups.append(candidate)
+        if len(follow_ups) >= 3:
+            break
+    return follow_ups
+
+
+def _hybrid_rank(question: str, matches: list[dict], top_k: int) -> list[dict]:
+    tokens = {token for token in re.findall(r"\w+", question.lower()) if len(token) >= 4}
+    reranked: list[dict] = []
+    for match in matches:
+        haystack = f"{match['title']} {match['section_path']} {match['content']}".lower()
+        lexical_hits = sum(1 for token in tokens if token in haystack)
+        lexical_score = lexical_hits / max(len(tokens), 1)
+        combined = (match["score"] * 0.8) + (lexical_score * 0.2)
+        reranked.append({**match, "score": combined})
+    reranked.sort(key=lambda item: item["score"], reverse=True)
+    return reranked[:top_k]
+
+
+def _normalize_question(question: str) -> str:
+    lowered = question.lower()
+    lowered = re.sub(r"[^\w\s]+", " ", lowered, flags=re.UNICODE)
+    return re.sub(r"\s+", " ", lowered).strip()
+
+
+def _require_admin(token: str | None) -> None:
+    expected = settings.admin_token.strip()
+    if not expected:
+        raise HTTPException(status_code=503, detail="Admin access is not configured.")
+    if token != expected:
+        raise HTTPException(status_code=401, detail="Admin authentication failed.")
+
+
+@app.get("/{full_path:path}")
+def spa_fallback(full_path: str):
+    dist_dir = settings.frontend_dist_dir
+    candidate = dist_dir / full_path
+    if full_path and candidate.exists() and candidate.is_file():
+        return FileResponse(candidate)
+    index_file = dist_dir / "index.html"
+    if index_file.exists():
+        return FileResponse(index_file)
+    raise HTTPException(status_code=404, detail="Frontend build not found.")
