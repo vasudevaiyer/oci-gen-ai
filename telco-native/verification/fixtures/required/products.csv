@@ -1,0 +1,23 @@
+product_id,brand_id,sku,product_name,description,category,subcategory,unit_price,unit_cost,weight_kg,is_active,launch_date,tags,created_at,updated_at
+1,1,SIG-00001,5G Unlimited Mobile Plan,,Mobile Service,5G Mobile,125,48,0.001,1,2026-04-01,"5G mobile,mobile-service,triage,virtual",2026-05-05T16:30:00Z,2026-05-05T16:30:00Z
+2,1,SIG-00002,Fiber Install Follow-Up Bundle,,Fiber Broadband,Install Follow-Up,210,82,0.001,1,2026-04-01,"fiber,install,follow-up,subscriber-experience",2026-05-05T16:30:00Z,2026-05-05T16:30:00Z
+3,1,SIG-00003,Bill Shock Review,,Billing Experience,Bill Review,95,35,0.001,1,2026-04-01,"billing,bill-shock,usage,retention",2026-05-05T16:30:00Z,2026-05-05T16:30:00Z
+4,2,VIT-00004,Same-Day Activation Support Slot,,Mobile Service,Access,160,65,0.001,1,2026-04-01,"activation,same-day,access,subscriber-care",2026-05-05T16:30:00Z,2026-05-05T16:30:00Z
+5,2,VIT-00005,Family Data Usage Review Program,,Subscriber Lifecycle,Family Data,340,125,0.001,1,2026-04-01,"family data,data-usage,subscriber-lifecycle,coaching",2026-05-05T16:30:00Z,2026-05-05T16:30:00Z
+6,2,VIT-00006,Latency Monitoring Package,,Subscriber Lifecycle,Service Assurance,275,98,0.05,1,2026-04-01,"latency,remote-monitoring,service-assurance",2026-05-05T16:30:00Z,2026-05-05T16:30:00Z
+7,3,PUL-00007,5G Services Consultation,,Enterprise Connectivity,5G Services,420,175,0.001,1,2026-04-01,"5G services,consultation,enterprise-connectivity",2026-05-05T16:30:00Z,2026-05-05T16:30:00Z
+8,3,PUL-00008,Home Wi-Fi Mesh Kit,,Network Monitoring,Home Wi-Fi,680,260,1.2,1,2026-04-01,"home-wifi,mesh-kit,throughput,monitoring",2026-05-05T16:30:00Z,2026-05-05T16:30:00Z
+9,3,PUL-00009,Device Upgrade Enrollment,,Field Operations,Device Upgrade,520,210,0.001,1,2026-04-01,"device-upgrade,enrollment,field-support",2026-05-05T16:30:00Z,2026-05-05T16:30:00Z
+10,4,CLE-00010,Customer Retention Intake,,Customer Retention,Intake,180,70,0.001,1,2026-04-01,"customer-retention,intake,churn-risk,access",2026-05-05T16:30:00Z,2026-05-05T16:30:00Z
+11,4,CLE-00011,Outage Follow-Up Call,,Customer Retention,Outage Follow-Up,140,58,0.001,1,2026-04-01,"outage,follow-up,subscriber-care",2026-05-05T16:30:00Z,2026-05-05T16:30:00Z
+12,4,CLE-00012,Fraud Resolution Case,,Customer Retention,Fraud Support,260,105,0.001,1,2026-04-01,"fraud-resolution,case-support,support-team",2026-05-05T16:30:00Z,2026-05-05T16:30:00Z
+13,5,ORT-00013,Field Technician Evaluation,,Field Operations,Dispatch Readiness,220,90,0.001,1,2026-04-01,"field-tech,evaluation,dispatch-readiness",2026-05-05T16:30:00Z,2026-05-05T16:30:00Z
+14,5,ORT-00014,Fiber Repair Recovery Bundle,,Field Operations,Fiber Repair,780,310,1.4,1,2026-04-01,"fiber-repair,recovery,truck-roll,spares",2026-05-05T16:30:00Z,2026-05-05T16:30:00Z
+15,5,ORT-00015,Smart Home Connectivity Assessment,,Connected Life,Home Connectivity,195,74,0.001,1,2026-04-01,"home-connectivity,home-wifi,assessment",2026-05-05T16:30:00Z,2026-05-05T16:30:00Z
+16,6,HOM-00016,Field Service Home Visit,,Field Operations,Home Visit,240,96,0.001,1,2026-04-01,"field-service,technician,home-visit,install",2026-05-05T16:30:00Z,2026-05-05T16:30:00Z
+17,6,HOM-00017,SIM Replacement Starter Kit,,Devices,SIM Support,145,54,0.9,1,2026-04-01,"sim,replacement,activation,supplies",2026-05-05T16:30:00Z,2026-05-05T16:30:00Z
+18,6,HOM-00018,Remote Subscriber Monitoring Onboarding,,Network Monitoring,Onboarding,310,120,0.4,1,2026-04-01,"remote-monitoring,onboarding,device,support-team",2026-05-05T16:30:00Z,2026-05-05T16:30:00Z
+19,7,MED-00019,5G Mobile Hotspot Kit,,Network Supplies,Family Data,89,31,0.35,1,2026-04-01,"hotspot,sim,kit,family data",2026-05-05T16:30:00Z,2026-05-05T16:30:00Z
+20,7,MED-00020,LTE Backup Gateway,,Network Monitoring,LTE Backup,115,42,0.5,1,2026-04-01,"lte,backup-gateway,network-monitoring",2026-05-05T16:30:00Z,2026-05-05T16:30:00Z
+23,8,WEL-00023,Network Congestion Plan Review,,Family Plans,Peak Usage Review,190,72,0.001,1,2026-04-01,"network-congestion,capacity-planning,family-plans",2026-05-05T16:30:00Z,2026-05-05T16:30:00Z
+24,9,SIL-00024,Senior Connected Life Plan,,Connected Life,Proactive Assurance,190,74,0.001,1,2026-04-01,"senior-connectivity,connected-life,proactive-assurance",2026-05-05T16:30:00Z,2026-05-05T16:30:00Z

@@ -1,0 +1,14 @@
+cd /u01/scripts/livestack/telco
+  podman-compose stop
+
+  Verify:
+
+  podman-compose ps
+
+  To stop and remove the containers/network entirely:
+
+  podman-compose down
+
+  Use stop if you plan to resume later:
+
+  podman-compose start

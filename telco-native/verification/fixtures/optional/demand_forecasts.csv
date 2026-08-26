@@ -1,0 +1,3 @@
+forecast_id,product_id,region,forecast_date,predicted_demand,confidence_low,confidence_high,social_factor,model_version,explanation,created_at
+1,1,Northeast Network Corridor,2026-05-06,145,120,180,1.42,telco_assurance_v2,"{""model"": ""telco_assurance_v2"", ""drivers"": [""subscriber_impact_spike"", ""capacity_constraint_signal""], ""confidence"": ""high"", ""alert"": ""pre_position_capacity_recommended""}",2026-05-05T16:30:00Z
+2,8,Southern Subscriber Lifecycle Belt,2026-05-06,88,70,115,1.31,telco_assurance_v2,"{""model"": ""telco_assurance_v2"", ""drivers"": [""subscriber_impact_spike"", ""capacity_constraint_signal""], ""confidence"": ""high"", ""alert"": ""pre_position_capacity_recommended""}",2026-05-05T16:30:00Z

@@ -1,0 +1,48 @@
+name: telco-native
+
+services:
+  app:
+    hostname: telco-native-app
+    build:
+      context: .
+      dockerfile: Containerfile
+    image: telco-native-app:latest
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: ${PORT:-3001}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:8510}
+      ORACLE_USER: ${ORACLE_USER:-LIVESTACK_NATIVE}
+      APP_SCHEMA_PASSWORD: ${APP_SCHEMA_PASSWORD:?APP_SCHEMA_PASSWORD is required}
+      ORACLE_CONNECTION_STRING: ${ORACLE_CONNECTION_STRING:-genaivasuatp_medium}
+      ORACLE_WALLET_LOCATION: ${ORACLE_WALLET_LOCATION:-/opt/oracle/wallet}
+      ORACLE_WALLET_PASSWORD: ${ORACLE_WALLET_PASSWORD:?ORACLE_WALLET_PASSWORD is required}
+      ORACLE_POOL_MIN: ${ORACLE_POOL_MIN:-2}
+      ORACLE_POOL_MAX: ${ORACLE_POOL_MAX:-10}
+      ORACLE_POOL_INCREMENT: ${ORACLE_POOL_INCREMENT:-1}
+      OCI_GENAI_BASE_URL: ${OCI_GENAI_BASE_URL:?OCI_GENAI_BASE_URL is required}
+      OCI_GENAI_API_KEY: ${OCI_GENAI_API_KEY:?OCI_GENAI_API_KEY is required}
+      OCI_GENAI_MODEL: ${OCI_GENAI_MODEL:?OCI_GENAI_MODEL is required}
+      OCI_GENAI_PROJECT_OCID: ${OCI_GENAI_PROJECT_OCID:-}
+      OCI_GENAI_JSON_MAX_TOKENS: ${OCI_GENAI_JSON_MAX_TOKENS:-1024}
+      OCI_GENAI_TEXT_MAX_TOKENS: ${OCI_GENAI_TEXT_MAX_TOKENS:-768}
+      OCI_GENAI_TIMEOUT_MS: ${OCI_GENAI_TIMEOUT_MS:-60000}
+      DEMO_USAGE_COUNTER_ENABLED: ${DEMO_USAGE_COUNTER_ENABLED:-false}
+      DEMO_USAGE_COUNTER_PAR_URL: ${DEMO_USAGE_COUNTER_PAR_URL:-}
+      DEMO_USAGE_COUNTER_PREFIX: ${DEMO_USAGE_COUNTER_PREFIX:-telco-native/events}
+      DEMO_USAGE_COUNTER_DEMO_ID: ${DEMO_USAGE_COUNTER_DEMO_ID:-telco-native}
+      DEMO_USAGE_COUNTER_TIMEOUT_MS: ${DEMO_USAGE_COUNTER_TIMEOUT_MS:-3000}
+    volumes:
+      - ./wallet:/opt/oracle/wallet:ro,z
+    ports:
+      - "${APP_PORT:-8510}:3001"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "node -e \"require('http').get('http://127.0.0.1:3001/api/health', (res) => process.exit(res.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))\""
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 15
+      start_period: 45s
+    restart: unless-stopped

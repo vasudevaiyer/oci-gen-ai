@@ -1,0 +1,7 @@
+influencer_id,handle,display_name,platform,follower_count,engagement_rate,influence_score,niche,city,region,country,is_verified,created_at
+1,@network_navigation,Network Navigation,threads,43800,0.072,86.2,Network Experience,New York,New York,US,0,2026-05-05T16:30:00Z
+2,@fiveg_cx_team,Five G CX Team,youtube,118000,0.041,88.4,5G Services,Dallas,Texas,US,1,2026-05-05T16:30:00Z
+3,@retention_assurance,Retention Assurance,instagram,67000,0.063,82.1,Customer Retention,Seattle,Washington,US,0,2026-05-05T16:30:00Z
+4,@home_connectivity_team,Home Connectivity Team,tiktok,54000,0.079,84.7,Home Connectivity,Atlanta,Georgia,US,0,2026-05-05T16:30:00Z
+5,@familyplan_pathways,Family Plan Pathways,instagram,73000,0.058,81.3,Family Plans,Boston,Massachusetts,US,0,2026-05-05T16:30:00Z
+6,@connected_life_support,Connected Life Support,threads,39500,0.066,77.8,Connected Life,Miami,Florida,US,0,2026-05-05T16:30:00Z
