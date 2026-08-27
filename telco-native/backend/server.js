@@ -10,6 +10,7 @@ const helmet = require('helmet');
 const morgan = require('morgan');
 const path = require('path');
 const db = require('./config/database');
+const bootstrap = require('./lib/bootstrapService');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -58,6 +59,26 @@ app.use('/api/demo', demoRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/selectai', selectaiRoutes);
 app.use('/api/import', importRoutes);
+
+app.post('/api/bootstrap', async (req, res) => {
+  if (process.env.BOOTSTRAP_TOKEN && req.get('x-bootstrap-token') !== process.env.BOOTSTRAP_TOKEN) {
+    return res.status(401).json({ error: 'Bootstrap authorization required' });
+  }
+  try {
+    return res.json(await bootstrap.initializeSchema());
+  } catch (err) {
+    console.error('Database bootstrap failed:', err);
+    return res.status(500).json({ error: 'Database bootstrap failed', message: err.message });
+  }
+});
+
+app.get('/api/bootstrap/status', async (req, res) => {
+  try {
+    return res.json({ status: 'ok', migrations: await bootstrap.status() });
+  } catch (err) {
+    return res.status(503).json({ error: 'Migration status unavailable', message: err.message });
+  }
+});
 
 // ── Health Check ───────────────────────────────────────────
 app.get('/api/health', async (req, res) => {

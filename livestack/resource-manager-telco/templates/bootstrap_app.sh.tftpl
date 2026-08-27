@@ -9,8 +9,7 @@ ENV_FILE="/etc/telco-native.env"
 CONTAINER_NAME="telco-native-app"
 CONTAINER_IMAGE="localhost/telco-native:local"
 
-dnf install -y nodejs npm git curl unzip podman oracle-instantclient-release-26ai-el8
-dnf install -y oracle-instantclient-basic oracle-instantclient-sqlplus
+dnf install -y nodejs npm git curl unzip podman
 mkdir -p "$${SRC_DIR}" "$${WALLET_DIR}"
 if [[ ! -d "$${APP_SRC}/.git" ]]; then
   git clone "${app_source_url}" "$${APP_SRC}"
@@ -21,31 +20,6 @@ git -C "$${APP_SRC}" checkout --detach "${app_source_ref}"
 if [[ ! -f "$${WALLET_DIR}/tnsnames.ora" ]]; then
   echo "ADB wallet is missing at $${WALLET_DIR}; stage it before starting the app." >&2
   exit 1
-fi
-
-# Configure SQL*Plus for the ADB wallet and run the native schema/data bootstrap.
-export TNS_ADMIN="$${WALLET_DIR}"
-cat > "$${WALLET_DIR}/sqlnet.ora" <<WALLET
-WALLET_LOCATION=(SOURCE=(METHOD=file)(METHOD_DATA=(DIRECTORY=$${WALLET_DIR})))
-SSL_SERVER_DN_MATCH=yes
-WALLET
-chmod 600 "$${WALLET_DIR}/sqlnet.ora"
-if [[ ! -f "$${APP_DIR}/.db_bootstrap_done" ]]; then
-  printf 'WHENEVER SQLERROR CONTINUE\nSET DEFINE OFF\n@%s\n@%s\nEXIT\n' \\
-    "$${APP_SRC}/db/schema/02_json_collections.sql" \\
-    "$${APP_SRC}/db/schema/03_graph.sql" > /tmp/native_schema.sql
-  printf '@%s\n@%s\n@%s\nEXIT\n' \\
-    "$${APP_SRC}/db/schema/04_vector.sql" \\
-    "$${APP_SRC}/db/schema/05_spatial.sql" \\
-    "$${APP_SRC}/db/schema/06_security.sql" >> /tmp/native_schema.sql
-  sqlplus -L -s "LIVESTACK_NATIVE:${app_schema_password}@${adb_service_alias}" @/tmp/native_schema.sql || true
-  printf 'WHENEVER SQLERROR CONTINUE\nSET DEFINE OFF\n@%s\n@%s\n@%s\nEXIT\n' \\
-    "$${APP_SRC}/db/data/load_all_data.sql" \\
-    "$${APP_SRC}/db/data/load_telecom_network_graph.sql" \\
-    "$${APP_SRC}/db/data/seed_fulfillment_zones.sql" > /tmp/native_data.sql
-  sqlplus -L -s "LIVESTACK_NATIVE:${app_schema_password}@${adb_service_alias}" @/tmp/native_data.sql || true
-  touch "$${APP_DIR}/.db_bootstrap_done"
-  rm -f /tmp/native_schema.sql /tmp/native_data.sql
 fi
 
 cd "$${APP_SRC}"
@@ -68,6 +42,11 @@ EOF
 chmod 600 "$${ENV_FILE}"
 chown -R opc:opc "$${APP_DIR}"
 
+podman build -t "$${CONTAINER_IMAGE}" "$${APP_SRC}"
+podman run --rm --network host --env-file "$${ENV_FILE}" \\
+  -v "$${WALLET_DIR}:/opt/wallet:ro" "$${CONTAINER_IMAGE}" \\
+  node scripts/bootstrap-native.js
+
 cat > /etc/systemd/system/telco-native.service <<EOF
 [Unit]
 Description=Telco Native application container
@@ -84,7 +63,6 @@ RestartSec=10
 WantedBy=multi-user.target
 EOF
 
-podman build -t "$${CONTAINER_IMAGE}" "$${APP_SRC}"
 systemctl daemon-reload
 systemctl enable --now telco-native.service
 for _ in {1..30}; do

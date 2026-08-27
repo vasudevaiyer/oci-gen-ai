@@ -19,6 +19,8 @@ COPY package*.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
 COPY backend ./backend
+COPY db ./db
+COPY scripts ./scripts
 COPY verification/demo-dataset ./verification/demo-dataset
 COPY --from=frontend-build /workspace/app/frontend/dist ./frontend/dist
 

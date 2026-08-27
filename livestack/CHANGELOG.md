@@ -1,5 +1,12 @@
 # Change Log
 
+## 2026-08-27
+
+- Added the VM-focused, application-owned Node/oracledb bootstrap service to `telco-native`, with versioned `LIVESTACK_NATIVE_MIGRATIONS` markers and an explicit `POST /api/bootstrap` endpoint.
+- Added the standalone `scripts/bootstrap-native.js` runner and included database/scripts assets in the runtime image.
+- Updated the VM Resource Manager cloud-init template to build the image and run the Node bootstrap inside the container; removed its SQL*Plus schema/data dependency. OKE artifacts were intentionally left unchanged.
+- Verified JavaScript syntax and parsed all configured schema/data migration files without executing migrations against the already-seeded native VM.
+
 ## 2026-08-13 (OKE access)
 
 - Confirmed the OKE cluster is `ACTIVE` with two `Ready` nodes; the existing local kubeconfig selected an unreachable private endpoint.
