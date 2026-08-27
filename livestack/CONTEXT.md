@@ -12,8 +12,9 @@ stack for test-environment spin-up. OKE is out of scope.
 - Terraform now creates the ADB wallet and stores it in a private Object Storage bucket/object. VM cloud-init downloads it with instance-principal authentication.
 - Cloud-init supports the repository-root source URL and automatically selects the `telco-native/` application subdirectory.
 - The Node bootstrap creates the application schema, records versioned migrations in `LIVESTACK_NATIVE_MIGRATIONS`, creates vector tables/indexes while leaving ONNX loading deferred, and runs the sectioned security migration.
-- The existing native VM at `147.224.133.80:8510` is healthy. It has not been destroyed or reprovisioned yet.
-- Next action: destroy and recreate the VM Resource Manager test stack only, then validate wallet delivery, schema creation, migrations, health, seeded data, and restart behavior.
+- The prior native test VM and `NATIVEDEVORD` ADB are now terminated after a successful Resource Manager destroy. The original `RAGDEVORD` ADB remains available; OKE resources remain running and are out of scope.
+- The destroy initially encountered a stale ADB private-endpoint VNIC attached to `telco-native-dev-ord-adb-nsg`; a retry succeeded after OCI cleanup.
+- Next action: provision the VM Resource Manager test stack from `origin/main`, then validate wallet delivery, schema creation, migrations, health, seeded data, and restart behavior.
 - Do not modify the original VM at `163.192.117.244` or begin OKE deployment work.
 
 ## Deployment

@@ -30,7 +30,8 @@ Commands for the deployed app must run over SSH on the target VM. Perform read-o
 - Commit `48c67c2` is pushed to `origin/main` and includes the complete sanitized VM stack plus the bootstrap fixes.
 - Terraform now generates the ADB wallet, stores it in a private Object Storage object, grants the VM instance principal object-read access, and downloads the wallet during cloud-init.
 - The application bootstrap creates the app schema with the ADB admin connection, records versioned migrations in `LIVESTACK_NATIVE_MIGRATIONS`, creates vector tables/indexes without loading the deferred ONNX model, and applies the sectioned security migration.
-- The current test VM remains healthy but has not been destroyed or reprovisioned. The next action is a controlled destroy/recreate test of the VM Resource Manager stack only; never modify the original VM at `163.192.117.244`.
+- The prior test VM and `NATIVEDEVORD` ADB were successfully destroyed after an OCI stale-ADB-VNIC retry. The original `RAGDEVORD` database remains available; OKE resources remain running and are out of scope.
+- The next action is to provision the VM Resource Manager stack from `origin/main`, then validate wallet delivery, app-schema creation, migrations, health, seeded data, and restart behavior. Never modify the original VM at `163.192.117.244`.
 
 ## Session workflow
 
