@@ -305,3 +305,9 @@ variable "freeform_tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "secret_name_nonce" {
+  description = "Change this value when recreating a stack whose prior Vault secrets are pending deletion."
+  type        = string
+  default     = "1"
+}

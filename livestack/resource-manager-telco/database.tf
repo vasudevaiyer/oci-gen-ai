@@ -9,6 +9,9 @@ resource "random_string" "app_schema_secret_suffix" {
   upper   = false
   special = false
   numeric = true
+  keepers = {
+    secret_name_nonce = var.secret_name_nonce
+  }
 }
 
 resource "oci_vault_secret" "app_schema_password" {
