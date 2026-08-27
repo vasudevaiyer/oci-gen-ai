@@ -31,7 +31,7 @@ resource "oci_vault_secret" "adb_admin_password" {
   compartment_id = local.resolved_compartment_ocid
   vault_id       = var.vault_ocid
   key_id         = var.kms_key_ocid
-  secret_name    = "${local.name_prefix}-adb-admin-password"
+  secret_name    = "${local.name_prefix}-adb-admin-password-${random_string.app_schema_secret_suffix.result}"
   secret_content {
     content      = base64encode(var.adb_admin_password)
     content_type = "BASE64"

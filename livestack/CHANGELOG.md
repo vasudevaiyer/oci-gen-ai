@@ -9,6 +9,7 @@
 - Extended the VM stack for clean rebuilds: Terraform now generates the ADB wallet into private Object Storage, grants the VM instance principal object-read access, and cloud-init downloads the wallet automatically.
 - Added application-schema creation, vector table/index bootstrap without ONNX loading, and section-aware security migration execution for fresh ADBs. OKE remains out of scope.
 - Destroyed the prior VM test stack successfully after retrying an OCI `NetworkSecurityGroup ... cannot be deleted since it still has vnics attached` error caused by the terminated ADB private endpoint. The original `RAGDEVORD` database was preserved; the next step is clean VM stack provisioning.
+- Changed the VM stack's ADB admin Vault secret name to use the generated suffix already used for the application secret, avoiding collisions with secrets pending deletion after a test-stack destroy.
 
 ## 2026-08-13 (OKE access)
 
