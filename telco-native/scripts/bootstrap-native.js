@@ -5,6 +5,7 @@ const db = require('../backend/config/database');
 const bootstrap = require('../backend/lib/bootstrapService');
 
 async function main() {
+  await bootstrap.ensureApplicationSchema();
   await db.initialize();
   console.log(JSON.stringify(await bootstrap.initializeSchema(), null, 2));
 }

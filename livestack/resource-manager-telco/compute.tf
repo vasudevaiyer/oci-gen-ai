@@ -37,6 +37,9 @@ resource "oci_core_instance" "app" {
         app_dir                        = "/opt/${local.name_prefix}"
         app_listen_port                = var.app_listen_port
         adb_admin_password_secret_ocid = oci_vault_secret.adb_admin_password.id
+        wallet_bucket_name             = oci_objectstorage_bucket.adb_wallet.name
+        wallet_object_name             = oci_objectstorage_object.adb_wallet.object
+        objectstorage_namespace        = data.oci_objectstorage_namespace.tenant.namespace
         adb_connect_string             = local.app_db_connect_string
         adb_service_alias              = lower("${local.adb_db_name}_${var.adb_service_name}")
         adb_wallet_password            = var.adb_admin_password

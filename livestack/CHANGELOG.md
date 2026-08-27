@@ -6,6 +6,8 @@
 - Added the standalone `scripts/bootstrap-native.js` runner and included database/scripts assets in the runtime image.
 - Updated the VM Resource Manager cloud-init template to build the image and run the Node bootstrap inside the container; removed its SQL*Plus schema/data dependency. OKE artifacts were intentionally left unchanged.
 - Verified JavaScript syntax and parsed all configured schema/data migration files without executing migrations against the already-seeded native VM.
+- Extended the VM stack for clean rebuilds: Terraform now generates the ADB wallet into private Object Storage, grants the VM instance principal object-read access, and cloud-init downloads the wallet automatically.
+- Added application-schema creation, vector table/index bootstrap without ONNX loading, and section-aware security migration execution for fresh ADBs. OKE remains out of scope.
 
 ## 2026-08-13 (OKE access)
 

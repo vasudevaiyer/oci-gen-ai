@@ -3,23 +3,35 @@ set -euo pipefail
 
 APP_DIR="${app_dir}"
 SRC_DIR="$${APP_DIR}/src"
-APP_SRC="$${SRC_DIR}/telco-native"
+REPO_DIR="$${SRC_DIR}/repository"
+APP_SRC="$${REPO_DIR}"
 WALLET_DIR="$${APP_DIR}/wallet"
 ENV_FILE="/etc/telco-native.env"
 CONTAINER_NAME="telco-native-app"
 CONTAINER_IMAGE="localhost/telco-native:local"
 
-dnf install -y nodejs npm git curl unzip podman
+dnf install -y nodejs npm git curl unzip podman oraclelinux-developer-release-el8 python36-oci-cli
 mkdir -p "$${SRC_DIR}" "$${WALLET_DIR}"
-if [[ ! -d "$${APP_SRC}/.git" ]]; then
-  git clone "${app_source_url}" "$${APP_SRC}"
+if [[ ! -d "$${REPO_DIR}/.git" ]]; then
+  git clone "${app_source_url}" "$${REPO_DIR}"
 fi
-git -C "$${APP_SRC}" fetch --depth 1 origin "${app_source_ref}"
-git -C "$${APP_SRC}" checkout --detach "${app_source_ref}"
+git -C "$${REPO_DIR}" fetch --depth 1 origin "${app_source_ref}"
+git -C "$${REPO_DIR}" checkout --detach "${app_source_ref}"
+
+if [[ ! -f "$${APP_SRC}/package.json" && -f "$${REPO_DIR}/telco-native/package.json" ]]; then
+  APP_SRC="$${REPO_DIR}/telco-native"
+fi
 
 if [[ ! -f "$${WALLET_DIR}/tnsnames.ora" ]]; then
-  echo "ADB wallet is missing at $${WALLET_DIR}; stage it before starting the app." >&2
-  exit 1
+  umask 077
+  oci os object get --auth instance_principal --region "${region}" \\
+    --namespace "${objectstorage_namespace}" \\
+    --bucket-name "${wallet_bucket_name}" \\
+    --name "${wallet_object_name}" \\
+    --file /tmp/telco-wallet.zip.b64
+  base64 --decode /tmp/telco-wallet.zip.b64 > /tmp/telco-wallet.zip
+  unzip -oq /tmp/telco-wallet.zip -d "$${WALLET_DIR}"
+  rm -f /tmp/telco-wallet.zip.b64 /tmp/telco-wallet.zip
 fi
 
 cd "$${APP_SRC}"
@@ -34,6 +46,7 @@ APP_SCHEMA_PASSWORD=${app_schema_password}
 ORACLE_CONNECTION_STRING=${adb_service_alias}
 ORACLE_WALLET_LOCATION=/opt/wallet
 ORACLE_WALLET_PASSWORD=${adb_wallet_password}
+BOOTSTRAP_ADMIN_PASSWORD=${adb_admin_password}
 OCI_GENAI_BASE_URL=${genai_endpoint}
 OCI_GENAI_MODEL=${chat_model_id}
 OCI_GENAI_API_KEY=placeholder
@@ -43,6 +56,7 @@ chmod 600 "$${ENV_FILE}"
 chown -R opc:opc "$${APP_DIR}"
 
 podman build -t "$${CONTAINER_IMAGE}" "$${APP_SRC}"
+trap 'sed -i "/^BOOTSTRAP_ADMIN_PASSWORD=/d" "$${ENV_FILE}"' EXIT
 podman run --rm --network host --env-file "$${ENV_FILE}" \\
   -v "$${WALLET_DIR}:/opt/wallet:ro" "$${CONTAINER_IMAGE}" \\
   node scripts/bootstrap-native.js
