@@ -11,6 +11,9 @@ CONTAINER_NAME="telco-native-app"
 CONTAINER_IMAGE="localhost/telco-native:local"
 
 dnf install -y git curl unzip podman oraclelinux-developer-release-el8 python36-oci-cli
+systemctl enable --now firewalld
+firewall-cmd --zone=public --permanent --add-port=${app_listen_port}/tcp
+firewall-cmd --reload
 mkdir -p "$${SRC_DIR}" "$${WALLET_DIR}"
 if [[ ! -d "$${REPO_DIR}/.git" ]]; then
   git clone "${app_source_url}" "$${REPO_DIR}"

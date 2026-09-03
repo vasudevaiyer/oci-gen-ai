@@ -2,6 +2,9 @@
 
 ## 2026-09-03
 
+- Added persistent firewalld configuration for the application listen port to
+  the Resource Manager cloud-init bootstrap. The current VM was updated and
+  externally verified before recording this reproducibility fix.
 - Fixed native bootstrap to seed schema and Telco data through an application-owned,
   retryable migration runner. The runner now handles SQL*Plus includes/directives,
   comments, multiline SQL, PL/SQL terminators, and expected already-applied DDL.
