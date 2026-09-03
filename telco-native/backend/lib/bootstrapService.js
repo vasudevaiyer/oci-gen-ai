@@ -61,7 +61,7 @@ async function ensureApplicationSchema() {
     `);
     for (const grant of [
       'CREATE SESSION', 'CREATE TABLE', 'CREATE VIEW', 'CREATE SEQUENCE',
-      'CREATE PROCEDURE', 'CREATE PACKAGE', 'CREATE TRIGGER', 'CREATE TYPE',
+      'CREATE PROCEDURE', 'CREATE TRIGGER', 'CREATE TYPE',
       'CREATE JOB', 'UNLIMITED TABLESPACE',
     ]) await admin.execute(`GRANT ${grant} TO ${schema}`);
     for (const grant of ['SODA_APP', 'GRAPH_DEVELOPER', 'AUDIT_ADMIN']) {
@@ -88,6 +88,11 @@ function section(source, start, end) {
   return source.slice(bodyStart, endAt < 0 ? source.length : endAt);
 }
 
+function isExpectedBootstrapError(err) {
+  return [955, 2260, 2261, 942, 1430, 13223].includes(err.errorNum)
+    || /ORA-(00955|02260|02261|00942|01430|13223)/.test(err.message || '');
+}
+
 async function runSecurityMigration(connection) {
   const file = path.resolve(__dirname, '../..', 'db/schema/06_security.sql');
   const source = fs.readFileSync(file, 'utf8');
@@ -106,21 +111,54 @@ async function runSecurityMigration(connection) {
   await connection.commit();
 }
 
-function parseSqlScript(source) {
+function parseSqlScript(source, baseDir = process.cwd()) {
   const statements = [];
   let buffer = [];
   let plsql = false;
+  let inBlockComment = false;
   const flush = () => {
-    const sql = buffer.join('\n').trim().replace(/;\s*$/, '');
-    if (sql) statements.push(sql);
+    const sql = buffer.join('\n').trim();
+    const executable = sql
+      .replace(/[\x2f][\x2a][\s\S]*?[\x2a][\x2f]/g, '')
+      .replace(/--.*$/gm, '')
+      .trim();
+    if (executable) statements.push(plsql ? executable : executable.replace(/;\s*$/, ''));
     buffer = [];
     plsql = false;
   };
   for (const line of source.split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (/^(SET|PROMPT|SPOOL|WHENEVER)\b/i.test(trimmed)) continue;
+    let executableLine = line;
+    if (inBlockComment) {
+      const end = executableLine.indexOf('*/');
+      if (end < 0) continue;
+      executableLine = executableLine.slice(end + 2);
+      inBlockComment = false;
+    }
+    while (true) {
+      const start = executableLine.indexOf('/*');
+      if (start < 0) break;
+      const end = executableLine.indexOf('*/', start + 2);
+      if (end < 0) {
+        executableLine = executableLine.slice(0, start);
+        inBlockComment = true;
+        break;
+      }
+      executableLine = executableLine.slice(0, start) + executableLine.slice(end + 2);
+    }
+    const trimmed = executableLine.trim();
+    if (!trimmed || trimmed.startsWith('--')) continue;
+    const include = trimmed.match(/^@@?(.+)$/);
+    if (include) {
+      const includeName = include[1].trim().split(/\s+/)[0];
+      const includeFile = path.resolve(baseDir, includeName);
+      if (!fs.existsSync(includeFile)) throw new Error(`Included SQL file not found: ${includeName}`);
+      statements.push(...parseSqlScript(fs.readFileSync(includeFile, 'utf8'), path.dirname(includeFile)));
+      continue;
+    }
+    if (/^SET\s+(SERVEROUTPUT|DEFINE)\b/i.test(trimmed)
+      || /^(PROMPT|SPOOL|WHENEVER)\b/i.test(trimmed)) continue;
     if (trimmed === '/') { if (plsql) flush(); continue; }
-    buffer.push(line);
+    buffer.push(executableLine);
     if (buffer.length === 1) {
       plsql = /^(DECLARE|BEGIN|CREATE\s+(OR\s+REPLACE\s+)?(FUNCTION|PROCEDURE|PACKAGE|TRIGGER)\b)/i.test(trimmed);
     }
@@ -159,8 +197,14 @@ async function initializeSchema() {
         }
         const file = path.resolve(__dirname, '../..', relativeFile);
         if (!fs.existsSync(file)) throw new Error(`Migration file not found: ${relativeFile}`);
-        const statements = parseSqlScript(fs.readFileSync(file, 'utf8'));
-        for (const statement of statements) await connection.execute(statement);
+        const statements = parseSqlScript(fs.readFileSync(file, 'utf8'), path.dirname(file));
+        for (const statement of statements) {
+          try {
+            await connection.execute(statement);
+          } catch (err) {
+            if (!isExpectedBootstrapError(err)) throw err;
+          }
+        }
         await connection.execute(`INSERT INTO ${MIGRATION_TABLE} (version) VALUES (:version)`, { version });
         await connection.commit();
         completed.push({ version, file: relativeFile, statements: statements.length });

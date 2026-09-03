@@ -2,6 +2,11 @@
 
 ## 2026-09-03
 
+- Fixed native bootstrap to seed schema and Telco data through an application-owned,
+  retryable migration runner. The runner now handles SQL*Plus includes/directives,
+  comments, multiline SQL, PL/SQL terminators, and expected already-applied DDL.
+  Verified all 12 migrations complete on the RM ADB, then corrected the VM app port
+  to 8510 and verified the native health endpoint with a connected database.
 - Fixed the Resource Manager bootstrap template's OCI wallet-download and
   bootstrap `podman run` continuations: Terraform was emitting literal extra
   backslashes, causing OCI CLI to reject the wallet command before application

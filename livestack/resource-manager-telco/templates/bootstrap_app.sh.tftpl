@@ -38,7 +38,7 @@ cd "$${APP_SRC}"
 
 cat > "$${ENV_FILE}" <<EOF
 NODE_ENV=production
-PORT=3001
+PORT=${app_listen_port}
 ORACLE_USER=${app_schema_name}
 APP_SCHEMA_PASSWORD=${app_schema_password}
 ORACLE_CONNECTION_STRING=${adb_service_alias}
