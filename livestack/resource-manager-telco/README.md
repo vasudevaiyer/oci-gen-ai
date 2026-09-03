@@ -1,6 +1,6 @@
 # Telco Native Resource Manager Stack
 
-Terraform stack for OCI Resource Manager that provisions the foundational infrastructure for the `rag_pipeline` service:
+Terraform stack for OCI Resource Manager that provisions the foundational infrastructure for the `telco-native` service:
 
 - VCN, public and private subnets
 - NSGs, internet/NAT/service gateways, route tables
@@ -28,7 +28,7 @@ After a successful apply, the stack outputs:
 
 This workspace is intentionally separate from the runnable application source in:
 
-- `../rag_pipeline`
+- `../telco-native`
 
 The stack assumes the application code is delivered to the VM at bootstrap time from an external source:
 
@@ -127,7 +127,7 @@ Before running this stack, the customer should already have:
 - The stack outputs the generated schema secret name and OCID, not the raw password value.
 - The application schema password secret name includes a short random suffix so repeated deployments do not collide with pending-deletion secret names in Vault.
 - Tenancy IAM resources such as dynamic groups and policies are created through the tenancy home region provider.
-- The RAG schema uses Oracle vector columns, so a 19c Autonomous Database is not sufficient for this application.
+- The Telco Native schema uses Oracle vector columns, so a 19c Autonomous Database is not sufficient for this application.
 - The public API Gateway is configured to route `/`, `/governance`, `/ui/*`, `/assets/*`, `/api/*`, `/chat`, and `/health`.
 
 ## Packaging For Resource Manager
@@ -141,11 +141,11 @@ When creating the Resource Manager upload bundle:
 
 ## How To Build The Upload Zip
 
-The upload zip for OCI Resource Manager should contain the contents of `rag_pipeline_stack/` at the root of the archive.
+The upload zip for OCI Resource Manager should contain the contents of `resource-manager-telco/` at the root of the archive.
 
 ### From a local clone
 
-1. Open the `rag_pipeline_stack/` folder.
+1. Open the `resource-manager-telco/` folder.
 2. Create a zip from that folder's contents only.
 3. Verify the zip includes files such as:
    - `provider.tf`
@@ -163,8 +163,8 @@ The upload zip for OCI Resource Manager should contain the contents of `rag_pipe
 
 1. Download the repository source zip.
 2. Extract it locally.
-3. Open the extracted `rag_pipeline_stack/` folder.
-4. Re-zip only the contents of `rag_pipeline_stack/`.
+3. Open the extracted `resource-manager-telco/` folder.
+4. Re-zip only the contents of `resource-manager-telco/`.
 5. Upload that new zip to OCI Resource Manager.
 
 ## Post-Apply Validation

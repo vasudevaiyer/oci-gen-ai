@@ -3,11 +3,11 @@ package_update: true
 package_upgrade: false
 
 write_files:
-  - path: /var/tmp/bootstrap_rag_pipeline.sh
+  - path: /var/tmp/bootstrap_telco_native.sh
     permissions: "0755"
     owner: root:root
     content: |
       ${replace(bootstrap_script, "\n", "\n      ")}
 
 runcmd:
-  - [ bash, /var/tmp/bootstrap_rag_pipeline.sh ]
+  - [ bash, /var/tmp/bootstrap_telco_native.sh ]
