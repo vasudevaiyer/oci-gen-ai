@@ -28,6 +28,18 @@ Use branch `main`. The application is in the `telco-native/` directory. The
 Resource Manager operator must be able to access the repository. If it is
 private, configure the required Git authentication before deployment.
 
+This is one repository with two components:
+
+```text
+oci-gen-ai/
+├── resource-manager-telco/   # Terraform/OCI infrastructure stack
+└── telco-native/              # Application source
+```
+
+The Resource Manager upload contains the contents of `resource-manager-telco/`.
+The VM clones the repository root from `app_source_url` and automatically
+selects `telco-native/` to build the application.
+
 ## 2. Prepare OCI prerequisites
 
 In the target tenancy, identify or create:
