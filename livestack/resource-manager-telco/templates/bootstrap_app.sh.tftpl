@@ -10,7 +10,7 @@ ENV_FILE="/etc/telco-native.env"
 CONTAINER_NAME="telco-native-app"
 CONTAINER_IMAGE="localhost/telco-native:local"
 
-dnf install -y nodejs npm git curl unzip podman oraclelinux-developer-release-el8 python36-oci-cli
+dnf install -y git curl unzip podman oraclelinux-developer-release-el8 python36-oci-cli
 mkdir -p "$${SRC_DIR}" "$${WALLET_DIR}"
 if [[ ! -d "$${REPO_DIR}/.git" ]]; then
   git clone "${app_source_url}" "$${REPO_DIR}"
@@ -24,10 +24,10 @@ fi
 
 if [[ ! -f "$${WALLET_DIR}/tnsnames.ora" ]]; then
   umask 077
-  oci os object get --auth instance_principal --region "${region}" \\
-    --namespace "${objectstorage_namespace}" \\
-    --bucket-name "${wallet_bucket_name}" \\
-    --name "${wallet_object_name}" \\
+  oci os object get --auth instance_principal --region "${region}" \
+    --namespace "${objectstorage_namespace}" \
+    --bucket-name "${wallet_bucket_name}" \
+    --name "${wallet_object_name}" \
     --file /tmp/telco-wallet.zip.b64
   base64 --decode /tmp/telco-wallet.zip.b64 > /tmp/telco-wallet.zip
   unzip -oq /tmp/telco-wallet.zip -d "$${WALLET_DIR}"
@@ -35,8 +35,6 @@ if [[ ! -f "$${WALLET_DIR}/tnsnames.ora" ]]; then
 fi
 
 cd "$${APP_SRC}"
-npm ci --omit=dev
-npm run build
 
 cat > "$${ENV_FILE}" <<EOF
 NODE_ENV=production
@@ -57,8 +55,8 @@ chown -R opc:opc "$${APP_DIR}"
 
 podman build -t "$${CONTAINER_IMAGE}" "$${APP_SRC}"
 trap 'sed -i "/^BOOTSTRAP_ADMIN_PASSWORD=/d" "$${ENV_FILE}"' EXIT
-podman run --rm --network host --env-file "$${ENV_FILE}" \\
-  -v "$${WALLET_DIR}:/opt/wallet:ro" "$${CONTAINER_IMAGE}" \\
+podman run --rm --network host --env-file "$${ENV_FILE}" \
+  -v "$${WALLET_DIR}:/opt/wallet:ro" "$${CONTAINER_IMAGE}" \
   node scripts/bootstrap-native.js
 
 cat > /etc/systemd/system/telco-native.service <<EOF

@@ -1,7 +1,41 @@
 # Change Log
 
+## 2026-09-03
+
+- Fixed the Resource Manager bootstrap template's OCI wallet-download and
+  bootstrap `podman run` continuations: Terraform was emitting literal extra
+  backslashes, causing OCI CLI to reject the wallet command before application
+  bootstrap. The corrected archive was stored in the existing test stack and
+  its VM replacement Apply succeeded; final first-boot application health is
+  still pending.
+- Removed the host-side Node/npm install and `npm ci` from the Resource Manager
+  bootstrap. The Telco native `Containerfile` already builds with Node 20, while
+  Oracle Linux 8 supplied Node 10/npm 6 and failed against the lockfile before
+  the container build.
+- Created `telco-native-test` through OCI CLI Resource Manager. The first Apply
+  failed at the Dynamic Group quota after the tenancy reached 50 groups; after
+  three old groups were removed, the retry Apply succeeded. The stack is ACTIVE,
+  its new `telco-native-test-ord-app-vm` is RUNNING, and its
+  `telco-native-test-ord-adb` is AVAILABLE with database name `NATIVETESTORD`.
+- Started the stopped isolated `telco-native` container project on the preserved
+  VM at port `8510`; `/api/health` returned HTTP 200 with the database connected.
+- Documented the Telco ONNX/vector lifecycle in `telco-codebase-observations.md`,
+  including model delivery to `DATA_PUMP_DIR`, `DBMS_VECTOR.LOAD_ONNX_MODEL`,
+  `VECTOR_EMBEDDING`, 384-dimensional vectors, cosine indexes, semantic-match
+  procedures, and the native clone's deferred embedding population.
+
 ## 2026-08-27
 
+- Added `resource-manager-telco/TEAM_DEPLOYMENT_GUIDE.md` with step-by-step
+  cross-tenancy Resource Manager deployment, verification, cleanup, and
+  troubleshooting instructions. No credentials or tenancy-specific secrets
+  were added.
+- Added an OCI CLI alternative to the team deployment guide for uploading the
+  Resource Manager zip, creating a stack, running Plan/Apply jobs, and viewing
+  outputs when the Console upload flow is unavailable.
+- Clarified that Console ZIP uploads use the archive root when the working
+  directory field is hidden, and documented the required root-level Terraform
+  file layout.
 - Added the VM-focused, application-owned Node/oracledb bootstrap service to `telco-native`, with versioned `LIVESTACK_NATIVE_MIGRATIONS` markers and an explicit `POST /api/bootstrap` endpoint.
 - Added the standalone `scripts/bootstrap-native.js` runner and included database/scripts assets in the runtime image.
 - Updated the VM Resource Manager cloud-init template to build the image and run the Node bootstrap inside the container; removed its SQL*Plus schema/data dependency. OKE artifacts were intentionally left unchanged.
